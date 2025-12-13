@@ -27,10 +27,16 @@ const features = [
   },
 ];
 
-const steps = [
+const encryptSteps = [
   { step: '1', title: 'Upload', description: 'Drag & drop your PDF files' },
   { step: '2', title: 'Set Password', description: 'Enter a secure password' },
   { step: '3', title: 'Download', description: 'Get your protected files' },
+];
+
+const mergeSteps = [
+  { step: '1', title: 'Upload', description: 'Add multiple PDF files' },
+  { step: '2', title: 'Reorder', description: 'Arrange pages as needed' },
+  { step: '3', title: 'Merge', description: 'Download combined PDF' },
 ];
 
 const Index = () => {
@@ -132,31 +138,80 @@ const Index = () => {
               How It Works
             </h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              Protect your documents in three simple steps
+              Simple steps for all your PDF needs
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            {steps.map((item, index) => (
+          <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
+            {/* Encrypt Process */}
+            <div>
               <motion.div
-                key={item.step}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="relative text-center"
+                className="flex items-center gap-3 mb-8"
               >
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl gradient-primary text-primary-foreground text-2xl font-bold mb-4 shadow-glow">
-                  {item.step}
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Lock className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold text-foreground mb-2">{item.title}</h3>
-                <p className="text-muted-foreground">{item.description}</p>
-                
-                {index < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-8 left-[60%] w-[80%] h-px bg-gradient-to-r from-border to-transparent" />
-                )}
+                <h3 className="text-xl font-semibold text-foreground">Encrypt PDF</h3>
               </motion.div>
-            ))}
+              <div className="space-y-6">
+                {encryptSteps.map((item, index) => (
+                  <motion.div
+                    key={`encrypt-${item.step}`}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-start gap-4"
+                  >
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl gradient-primary text-primary-foreground text-lg font-bold flex items-center justify-center shadow-glow">
+                      {item.step}
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-foreground">{item.title}</h4>
+                      <p className="text-sm text-muted-foreground">{item.description}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* Merge Process */}
+            <div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="flex items-center gap-3 mb-8"
+              >
+                <div className="p-2 rounded-lg bg-accent/10">
+                  <Layers className="w-5 h-5 text-accent" />
+                </div>
+                <h3 className="text-xl font-semibold text-foreground">Merge PDFs</h3>
+              </motion.div>
+              <div className="space-y-6">
+                {mergeSteps.map((item, index) => (
+                  <motion.div
+                    key={`merge-${item.step}`}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-start gap-4"
+                  >
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-accent text-accent-foreground text-lg font-bold flex items-center justify-center">
+                      {item.step}
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-foreground">{item.title}</h4>
+                      <p className="text-sm text-muted-foreground">{item.description}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
