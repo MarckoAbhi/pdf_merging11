@@ -1,6 +1,13 @@
 import { PDFDocument } from 'pdf-lib';
 import { jsPDF } from 'jspdf';
 
+// Dynamically import pdfjs-dist to avoid top-level await issues
+const loadPdfJs = async () => {
+  const pdfjsLib = await import('pdfjs-dist');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+  return pdfjsLib;
+};
+
 export interface ProcessedPDF {
   id: string;
   name: string;
@@ -34,27 +41,28 @@ export const encryptPDF = async (
 ): Promise<Blob> => {
   const arrayBuffer = await file.arrayBuffer();
   
-  // Load the PDF with pdf-lib to get page info
-  const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
-  const numPages = pdfDoc.getPageCount();
+  // Load PDF.js dynamically
+  const pdfjsLib = await loadPdfJs();
+  
+  // Load PDF with pdf.js for rendering
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdfDocument = await loadingTask.promise;
+  const numPages = pdfDocument.numPages;
 
   if (numPages === 0) {
     throw new Error('PDF has no pages');
   }
 
-  // Get page dimensions for each page
-  const pages = pdfDoc.getPages();
-  
-  // Create encrypted PDF using jsPDF with password protection
-  // We'll recreate the PDF structure with encryption
-  const firstPage = pages[0];
-  const { width: firstWidth, height: firstHeight } = firstPage.getSize();
-  const orientation = firstWidth > firstHeight ? 'landscape' : 'portrait';
+  // Get first page to determine initial dimensions
+  const firstPage = await pdfDocument.getPage(1);
+  const firstViewport = firstPage.getViewport({ scale: 2 }); // Higher scale for quality
+  const orientation = firstViewport.width > firstViewport.height ? 'landscape' : 'portrait';
 
+  // Create encrypted PDF using jsPDF
   const doc = new jsPDF({
     orientation: orientation as 'portrait' | 'landscape',
     unit: 'pt',
-    format: [firstWidth, firstHeight],
+    format: [firstViewport.width / 2, firstViewport.height / 2],
     encryption: {
       userPassword: password,
       ownerPassword: password,
@@ -62,48 +70,47 @@ export const encryptPDF = async (
     }
   });
 
-  // Add info about the encryption
-  doc.setProperties({
-    title: file.name.replace('.pdf', ''),
-    subject: 'Password Protected PDF',
-    creator: 'PDF Tools'
-  });
+  // Render each page to canvas and add to jsPDF
+  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+    const page = await pdfDocument.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 2 });
+    
+    // Create canvas for rendering
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    if (!context) {
+      throw new Error('Could not create canvas context');
+    }
+    
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
 
-  // For each page, we need to add content
-  // Since jsPDF can't directly import PDF pages, we'll embed the original PDF data
-  // and add a note about the protection
-  for (let i = 0; i < numPages; i++) {
-    const page = pages[i];
-    const { width: pageWidth, height: pageHeight } = page.getSize();
+    // Render PDF page to canvas
+    await page.render({
+      canvasContext: context,
+      viewport: viewport
+    }).promise;
 
-    if (i > 0) {
+    // Convert canvas to image data
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    
+    // Add new page if not first
+    if (pageNum > 1) {
       doc.addPage(
-        [pageWidth, pageHeight],
-        pageWidth > pageHeight ? 'landscape' : 'portrait'
+        [viewport.width / 2, viewport.height / 2],
+        viewport.width > viewport.height ? 'landscape' : 'portrait'
       );
     }
 
-    // Add page content indicator
-    doc.setFontSize(14);
-    doc.setTextColor(100, 100, 100);
-    doc.text(
-      `Protected Document - Page ${i + 1} of ${numPages}`,
-      pageWidth / 2,
-      pageHeight / 2 - 20,
-      { align: 'center' }
-    );
-    doc.setFontSize(10);
-    doc.text(
-      'This PDF has been password protected.',
-      pageWidth / 2,
-      pageHeight / 2 + 10,
-      { align: 'center' }
-    );
-    doc.text(
-      `Original file: ${file.name}`,
-      pageWidth / 2,
-      pageHeight / 2 + 30,
-      { align: 'center' }
+    // Add image to PDF (scaled back to original size)
+    doc.addImage(
+      imgData,
+      'JPEG',
+      0,
+      0,
+      viewport.width / 2,
+      viewport.height / 2
     );
   }
 
