@@ -58,7 +58,7 @@ const Index = () => {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6"
             >
               <Shield className="w-4 h-4" />
-              Free & Secure PDF Protection
+              Free & Secure Files Protection
             </motion.div>
 
             <motion.h1
@@ -67,7 +67,7 @@ const Index = () => {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="text-4xl md:text-6xl lg:text-7xl font-extrabold text-foreground leading-tight mb-6"
             >
-              Protect Your PDFs with{' '}
+              Protect Your Files with{' '}
               <span className="text-gradient">Password Security</span>
             </motion.h1>
 
@@ -90,14 +90,14 @@ const Index = () => {
               <Link to="/encrypt">
                 <Button size="lg" className="gap-2 gradient-primary text-primary-foreground shadow-glow px-8 h-14 text-lg">
                   <Lock className="w-5 h-5" />
-                  Encrypt PDF
+                  Encrypt Files
                   <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
               <Link to="/unlock">
                 <Button size="lg" variant="outline" className="gap-2 px-8 h-14 text-lg">
                   <Unlock className="w-5 h-5" />
-                  Unlock PDF
+                  Unlock Files
                 </Button>
               </Link>
               <Link to="/merge">
@@ -154,7 +154,7 @@ const Index = () => {
                 <div className="p-2 rounded-lg bg-primary/10">
                   <Lock className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold text-foreground">Encrypt PDF</h3>
+                <h3 className="text-xl font-semibold text-foreground">Encrypt Files</h3>
               </motion.div>
               <div className="space-y-6">
                 {encryptSteps.map((item, index) => (
