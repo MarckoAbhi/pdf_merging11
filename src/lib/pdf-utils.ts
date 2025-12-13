@@ -1,5 +1,9 @@
 import { PDFDocument } from 'pdf-lib';
-import { supabase } from '@/integrations/supabase/client';
+import { jsPDF } from 'jspdf';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js`;
 
 export interface ProcessedPDF {
   id: string;
@@ -32,34 +36,79 @@ export const encryptPDF = async (
   file: File,
   password: string
 ): Promise<Blob> => {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('password', password);
+  const arrayBuffer = await file.arrayBuffer();
+  
+  // Load PDF with pdf.js for rendering
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdfDocument = await loadingTask.promise;
+  const numPages = pdfDocument.numPages;
 
-  const { data } = await supabase.functions.invoke('encrypt-pdf', {
-    body: formData,
+  if (numPages === 0) {
+    throw new Error('PDF has no pages');
+  }
+
+  // Get first page to determine initial dimensions
+  const firstPage = await pdfDocument.getPage(1);
+  const firstViewport = firstPage.getViewport({ scale: 2 }); // Higher scale for quality
+  const orientation = firstViewport.width > firstViewport.height ? 'landscape' : 'portrait';
+
+  // Create encrypted PDF using jsPDF
+  const doc = new jsPDF({
+    orientation,
+    unit: 'pt',
+    format: [firstViewport.width / 2, firstViewport.height / 2], // Scale back for document size
+    encryption: {
+      userPassword: password,
+      ownerPassword: password,
+      userPermissions: ['print', 'copy']
+    }
   });
 
-  // Check if response is an error
-  if (data?.error) {
-    throw new Error(data.error);
+  // Render each page to canvas and add to jsPDF
+  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+    const page = await pdfDocument.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 2 });
+    
+    // Create canvas for rendering
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    if (!context) {
+      throw new Error('Could not create canvas context');
+    }
+    
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    // Render PDF page to canvas
+    await page.render({
+      canvasContext: context,
+      viewport: viewport
+    }).promise;
+
+    // Convert canvas to image data
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    
+    // Add new page if not first
+    if (pageNum > 1) {
+      doc.addPage(
+        [viewport.width / 2, viewport.height / 2],
+        viewport.width > viewport.height ? 'landscape' : 'portrait'
+      );
+    }
+
+    // Add image to PDF (scaled back to original size)
+    doc.addImage(
+      imgData,
+      'JPEG',
+      0,
+      0,
+      viewport.width / 2,
+      viewport.height / 2
+    );
   }
 
-  // The response should be a blob
-  if (data instanceof Blob) {
-    return data;
-  }
-
-  // If we got raw bytes, convert to blob
-  if (data instanceof ArrayBuffer) {
-    return new Blob([data], { type: 'application/pdf' });
-  }
-  
-  if (data instanceof Uint8Array) {
-    return new Blob([data.slice().buffer], { type: 'application/pdf' });
-  }
-
-  throw new Error('Unexpected response format from encryption service');
+  return doc.output('blob');
 };
 
 export const getPDFInfo = async (file: File): Promise<{ pageCount: number }> => {
