@@ -157,7 +157,9 @@
   }
   
   .text-gradient {
-    @apply bg-clip-text text-transparent;
     background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 }
