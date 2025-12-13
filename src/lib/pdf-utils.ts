@@ -1,4 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface ProcessedPDF {
   id: string;
@@ -29,16 +30,36 @@ export const generateFileId = (): string => {
 
 export const encryptPDF = async (
   file: File,
-  userPassword: string,
-  ownerPassword?: string
+  password: string
 ): Promise<Blob> => {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdfDoc = await PDFDocument.load(arrayBuffer);
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('password', password);
+
+  const { data } = await supabase.functions.invoke('encrypt-pdf', {
+    body: formData,
+  });
+
+  // Check if response is an error
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+
+  // The response should be a blob
+  if (data instanceof Blob) {
+    return data;
+  }
+
+  // If we got raw bytes, convert to blob
+  if (data instanceof ArrayBuffer) {
+    return new Blob([data], { type: 'application/pdf' });
+  }
   
-  // Note: pdf-lib doesn't support native encryption
-  // The PDF is processed and saved - full encryption would require server-side processing
-  const pdfBytes = await pdfDoc.save();
-  return new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+  if (data instanceof Uint8Array) {
+    return new Blob([data.slice().buffer], { type: 'application/pdf' });
+  }
+
+  throw new Error('Unexpected response format from encryption service');
 };
 
 export const getPDFInfo = async (file: File): Promise<{ pageCount: number }> => {
@@ -70,6 +91,24 @@ export const decryptPDF = async (
     }
     throw new Error('Failed to unlock PDF. The file may be corrupted.');
   }
+};
+
+export const mergePDFs = async (files: File[]): Promise<Blob> => {
+  if (files.length < 2) {
+    throw new Error('At least 2 PDF files are required to merge');
+  }
+
+  const mergedPdf = await PDFDocument.create();
+
+  for (const file of files) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+    const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+    pages.forEach((page) => mergedPdf.addPage(page));
+  }
+
+  const mergedBytes = await mergedPdf.save();
+  return new Blob([new Uint8Array(mergedBytes)], { type: 'application/pdf' });
 };
 
 export const downloadBlob = (blob: Blob, filename: string) => {
