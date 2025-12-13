@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Shield, Lock, Unlock, Menu, X } from 'lucide-react';
+import { Shield, Lock, Unlock, Menu, X, Layers } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 const navLinks = [
   { href: '/encrypt', label: 'Encrypt PDF', icon: Lock },
   { href: '/unlock', label: 'Unlock PDF', icon: Unlock },
+  { href: '/merge', label: 'Merge PDFs', icon: Layers },
 ];
 
 export const Header = () => {

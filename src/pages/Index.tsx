@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock, Unlock, Shield, Zap, Eye, FileText, ArrowRight, CheckCircle } from 'lucide-react';
+import { Lock, Unlock, Shield, Zap, Eye, FileText, ArrowRight, CheckCircle, Layers } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 
@@ -18,12 +18,12 @@ const features = [
   {
     icon: Eye,
     title: 'Privacy First',
-    description: 'Your files are processed locally. We never store your documents.',
+    description: 'Your files are processed securely. We never store your documents.',
   },
   {
-    icon: FileText,
-    title: 'Batch Processing',
-    description: 'Encrypt or unlock multiple PDFs at once with a single password.',
+    icon: Layers,
+    title: 'Merge PDFs',
+    description: 'Combine multiple PDF files into a single document effortlessly.',
   },
 ];
 
@@ -79,7 +79,7 @@ const Index = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
-              className="flex flex-col sm:flex-row gap-4 justify-center"
+              className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap"
             >
               <Link to="/encrypt">
                 <Button size="lg" className="gap-2 gradient-primary text-primary-foreground shadow-glow px-8 h-14 text-lg">
@@ -92,6 +92,12 @@ const Index = () => {
                 <Button size="lg" variant="outline" className="gap-2 px-8 h-14 text-lg">
                   <Unlock className="w-5 h-5" />
                   Unlock PDF
+                </Button>
+              </Link>
+              <Link to="/merge">
+                <Button size="lg" variant="outline" className="gap-2 px-8 h-14 text-lg">
+                  <Layers className="w-5 h-5" />
+                  Merge PDFs
                 </Button>
               </Link>
             </motion.div>
@@ -212,7 +218,7 @@ const Index = () => {
             <p className="text-muted-foreground mb-8">
               Start protecting your documents now. It's free and takes just seconds.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
               <Link to="/encrypt">
                 <Button size="lg" className="gap-2 gradient-primary text-primary-foreground shadow-glow">
                   <Lock className="w-5 h-5" />
@@ -223,6 +229,12 @@ const Index = () => {
                 <Button size="lg" variant="outline" className="gap-2">
                   <Unlock className="w-5 h-5" />
                   Unlock PDF
+                </Button>
+              </Link>
+              <Link to="/merge">
+                <Button size="lg" variant="outline" className="gap-2">
+                  <Layers className="w-5 h-5" />
+                  Merge PDFs
                 </Button>
               </Link>
             </div>
