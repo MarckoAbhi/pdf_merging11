@@ -295,3 +295,64 @@ export const convertPDFToImages = async (file: File, format: 'png' | 'jpeg'): Pr
 
   return images;
 };
+
+export const convertImagesToPDF = async (files: File[]): Promise<Blob> => {
+  if (files.length === 0) {
+    throw new Error('No images provided');
+  }
+
+  const pdfDoc = await PDFDocument.create();
+
+  for (const file of files) {
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    
+    let image;
+    const mimeType = file.type.toLowerCase();
+    
+    if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+      image = await pdfDoc.embedJpg(bytes);
+    } else if (mimeType === 'image/png') {
+      image = await pdfDoc.embedPng(bytes);
+    } else {
+      // For other formats, convert to PNG using canvas
+      const img = await loadImage(file);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Could not create canvas context');
+      ctx.drawImage(img, 0, 0);
+      
+      const pngBlob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error('Failed to convert image'))),
+          'image/png'
+        );
+      });
+      
+      const pngBuffer = await pngBlob.arrayBuffer();
+      image = await pdfDoc.embedPng(new Uint8Array(pngBuffer));
+    }
+
+    const page = pdfDoc.addPage([image.width, image.height]);
+    page.drawImage(image, {
+      x: 0,
+      y: 0,
+      width: image.width,
+      height: image.height,
+    });
+  }
+
+  const pdfBytes = await pdfDoc.save();
+  return new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+};
+
+const loadImage = (file: File): Promise<HTMLImageElement> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+};
