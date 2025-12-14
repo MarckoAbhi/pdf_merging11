@@ -3,15 +3,14 @@ import { motion } from 'framer-motion';
 import { Lock, ShieldCheck, AlertTriangle } from 'lucide-react';
 import JSZip from 'jszip';
 import { Layout } from '@/components/layout/Layout';
-import { FileDropzone } from '@/components/pdf/FileDropzone';
+import { GeneralFileDropzone } from '@/components/file/GeneralFileDropzone';
 import { PasswordInput } from '@/components/pdf/PasswordInput';
-import { ProcessingStatus } from '@/components/pdf/ProcessingStatus';
 import { Button } from '@/components/ui/button';
-import { ProcessedPDF, encryptPDF, downloadBlob, getPDFInfo } from '@/lib/pdf-utils';
+import { ProcessedFile, encryptFile, downloadBlob, getEncryptedFileName } from '@/lib/file-utils';
 import { useToast } from '@/hooks/use-toast';
 
 const Encrypt = () => {
-  const [files, setFiles] = useState<ProcessedPDF[]>([]);
+  const [files, setFiles] = useState<ProcessedFile[]>([]);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -22,7 +21,7 @@ const Encrypt = () => {
     if (!password) {
       toast({
         title: 'Password required',
-        description: 'Please enter a password to encrypt your PDFs.',
+        description: 'Please enter a password to encrypt your files.',
         variant: 'destructive',
       });
       return;
@@ -40,7 +39,7 @@ const Encrypt = () => {
     if (files.length === 0) {
       toast({
         title: 'No files selected',
-        description: 'Please upload at least one PDF file.',
+        description: 'Please upload at least one file.',
         variant: 'destructive',
       });
       return;
@@ -56,26 +55,18 @@ const Encrypt = () => {
       setFiles([...updatedFiles]);
 
       try {
-        // Get PDF info first
-        const info = await getPDFInfo(updatedFiles[i].originalFile);
-        
-        // Encrypt the PDF
-        const encryptedBlob = await encryptPDF(
-          updatedFiles[i].originalFile,
-          password
-        );
+        const encryptedBlob = await encryptFile(updatedFiles[i].originalFile, password);
 
         updatedFiles[i] = {
           ...updatedFiles[i],
           status: 'success',
           processedBlob: encryptedBlob,
-          pageCount: info.pageCount,
         };
       } catch (error) {
         updatedFiles[i] = {
           ...updatedFiles[i],
           status: 'error',
-          error: error instanceof Error ? error.message : 'Failed to encrypt PDF',
+          error: error instanceof Error ? error.message : 'Failed to encrypt file',
         };
       }
 
@@ -94,9 +85,9 @@ const Encrypt = () => {
     }
   }, [files, password, confirmPassword, toast]);
 
-  const handleDownload = useCallback((file: ProcessedPDF) => {
+  const handleDownload = useCallback((file: ProcessedFile) => {
     if (file.processedBlob) {
-      const newName = file.name.replace('.pdf', '_protected.pdf');
+      const newName = getEncryptedFileName(file.name);
       downloadBlob(file.processedBlob, newName);
     }
   }, []);
@@ -106,18 +97,23 @@ const Encrypt = () => {
     
     if (successFiles.length === 0) return;
 
+    if (successFiles.length === 1) {
+      handleDownload(successFiles[0]);
+      return;
+    }
+
     const zip = new JSZip();
     
     for (const file of successFiles) {
       if (file.processedBlob) {
-        const newName = file.name.replace('.pdf', '_protected.pdf');
+        const newName = getEncryptedFileName(file.name);
         zip.file(newName, file.processedBlob);
       }
     }
 
     const zipBlob = await zip.generateAsync({ type: 'blob' });
-    downloadBlob(zipBlob, 'protected_pdfs.zip');
-  }, [files]);
+    downloadBlob(zipBlob, 'encrypted_files.zip');
+  }, [files, handleDownload]);
 
   const handleReset = useCallback(() => {
     setFiles([]);
@@ -127,6 +123,7 @@ const Encrypt = () => {
   }, []);
 
   const canEncrypt = files.length > 0 && password && password === confirmPassword && !isProcessing;
+  const successFiles = files.filter((f) => f.status === 'success');
 
   return (
     <Layout>
@@ -141,10 +138,10 @@ const Encrypt = () => {
               <Lock className="w-8 h-8" />
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
-              Encrypt PDF Files
+              Encrypt Any File
             </h1>
             <p className="text-muted-foreground">
-              Add password protection to your PDF documents
+              Protect images, documents, PDFs, ZIP files, and more with password encryption
             </p>
           </motion.div>
 
@@ -157,8 +154,8 @@ const Encrypt = () => {
             {!isComplete ? (
               <>
                 <div className="p-6 rounded-2xl bg-card border border-border">
-                  <h2 className="font-semibold text-foreground mb-4">1. Upload PDFs</h2>
-                  <FileDropzone files={files} onFilesChange={setFiles} />
+                  <h2 className="font-semibold text-foreground mb-4">1. Upload Files</h2>
+                  <GeneralFileDropzone files={files} onFilesChange={setFiles} />
                 </div>
 
                 <div className="p-6 rounded-2xl bg-card border border-border">
@@ -180,7 +177,7 @@ const Encrypt = () => {
                   <div className="text-sm">
                     <p className="font-medium text-foreground">AES-256 Encryption</p>
                     <p className="text-muted-foreground">
-                      Your PDFs are encrypted with military-grade security. Files are processed securely and never stored.
+                      Your files are encrypted with military-grade security using Web Crypto API. Files are processed locally and never uploaded.
                     </p>
                   </div>
                 </div>
@@ -198,7 +195,7 @@ const Encrypt = () => {
                   ) : (
                     <>
                       <Lock className="w-5 h-5" />
-                      Encrypt {files.length > 0 ? `${files.length} PDF${files.length > 1 ? 's' : ''}` : 'PDFs'}
+                      Encrypt {files.length > 0 ? `${files.length} File${files.length > 1 ? 's' : ''}` : 'Files'}
                     </>
                   )}
                 </Button>
@@ -206,13 +203,40 @@ const Encrypt = () => {
             ) : (
               <>
                 <div className="p-6 rounded-2xl bg-card border border-border">
-                  <h2 className="font-semibold text-foreground mb-4">Download Protected Files</h2>
-                  <ProcessingStatus
-                    files={files}
-                    onDownload={handleDownload}
-                    onDownloadAll={handleDownloadAll}
-                    actionLabel="protected"
-                  />
+                  <h2 className="font-semibold text-foreground mb-4">Download Encrypted Files</h2>
+                  <div className="space-y-3">
+                    {files.map((file) => (
+                      <div
+                        key={file.id}
+                        className={`flex items-center justify-between p-4 rounded-xl border ${
+                          file.status === 'success'
+                            ? 'bg-success/5 border-success/20'
+                            : 'bg-destructive/5 border-destructive/20'
+                        }`}
+                      >
+                        <div>
+                          <p className="font-medium text-foreground">{file.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {file.status === 'success' ? 'Encrypted' : file.error}
+                          </p>
+                        </div>
+                        {file.status === 'success' && (
+                          <Button size="sm" onClick={() => handleDownload(file)}>
+                            Download
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    
+                    {successFiles.length > 1 && (
+                      <Button
+                        onClick={handleDownloadAll}
+                        className="w-full h-12 gap-2 gradient-primary text-primary-foreground"
+                      >
+                        Download All as ZIP
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-warning/10 border border-warning/20">
@@ -220,7 +244,7 @@ const Encrypt = () => {
                   <div className="text-sm">
                     <p className="font-medium text-foreground">Remember your password</p>
                     <p className="text-muted-foreground">
-                      You'll need the password to open these files. We don't store passwords, so make sure to save it securely.
+                      You'll need the password to decrypt these files. We don't store passwords, so make sure to save it securely.
                     </p>
                   </div>
                 </div>
@@ -230,7 +254,7 @@ const Encrypt = () => {
                   variant="outline"
                   className="w-full h-12"
                 >
-                  Encrypt More PDFs
+                  Encrypt More Files
                 </Button>
               </>
             )}

@@ -7,6 +7,9 @@ import Index from "./pages/Index";
 import Encrypt from "./pages/Encrypt";
 import Unlock from "./pages/Unlock";
 import Merge from "./pages/Merge";
+import Compress from "./pages/Compress";
+import Convert from "./pages/Convert";
+import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +25,9 @@ const App = () => (
           <Route path="/encrypt" element={<Encrypt />} />
           <Route path="/unlock" element={<Unlock />} />
           <Route path="/merge" element={<Merge />} />
+          <Route path="/compress" element={<Compress />} />
+          <Route path="/convert" element={<Convert />} />
+          <Route path="/about" element={<About />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
