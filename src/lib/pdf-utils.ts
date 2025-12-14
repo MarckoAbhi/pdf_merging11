@@ -184,3 +184,96 @@ export const formatFileSize = (bytes: number): string => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
+
+export const compressPDF = async (file: File, quality: number): Promise<Blob> => {
+  const arrayBuffer = await file.arrayBuffer();
+  
+  const pdfjsLib = await loadPdfJs();
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdfDocument = await loadingTask.promise;
+  const numPages = pdfDocument.numPages;
+
+  if (numPages === 0) {
+    throw new Error('PDF has no pages');
+  }
+
+  const firstPage = await pdfDocument.getPage(1);
+  const scale = quality > 70 ? 1.5 : quality > 40 ? 1.2 : 1;
+  const firstViewport = firstPage.getViewport({ scale });
+  const orientation = firstViewport.width > firstViewport.height ? 'landscape' : 'portrait';
+
+  const doc = new jsPDF({
+    orientation: orientation as 'portrait' | 'landscape',
+    unit: 'pt',
+    format: [firstViewport.width / scale, firstViewport.height / scale],
+    compress: true,
+  });
+
+  const jpegQuality = quality / 100;
+
+  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+    const page = await pdfDocument.getPage(pageNum);
+    const viewport = page.getViewport({ scale });
+    
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    if (!context) throw new Error('Could not create canvas context');
+    
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    await page.render({ canvasContext: context, viewport }).promise;
+
+    const imgData = canvas.toDataURL('image/jpeg', jpegQuality);
+    
+    if (pageNum > 1) {
+      doc.addPage(
+        [viewport.width / scale, viewport.height / scale],
+        viewport.width > viewport.height ? 'landscape' : 'portrait'
+      );
+    }
+
+    doc.addImage(imgData, 'JPEG', 0, 0, viewport.width / scale, viewport.height / scale);
+  }
+
+  return doc.output('blob');
+};
+
+export const convertPDFToImages = async (file: File, format: 'png' | 'jpeg'): Promise<Blob[]> => {
+  const arrayBuffer = await file.arrayBuffer();
+  
+  const pdfjsLib = await loadPdfJs();
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdfDocument = await loadingTask.promise;
+  const numPages = pdfDocument.numPages;
+
+  const images: Blob[] = [];
+
+  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+    const page = await pdfDocument.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 2 });
+    
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    if (!context) throw new Error('Could not create canvas context');
+    
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    await page.render({ canvasContext: context, viewport }).promise;
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error('Failed to create image'))),
+        `image/${format}`,
+        format === 'jpeg' ? 0.92 : undefined
+      );
+    });
+
+    images.push(blob);
+  }
+
+  return images;
+};
