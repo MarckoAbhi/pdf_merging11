@@ -10,11 +10,11 @@ export interface ProcessedFile {
   type: string;
 }
 
-export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+export const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
 export const validateFile = (file: File): { valid: boolean; error?: string } => {
   if (file.size > MAX_FILE_SIZE) {
-    return { valid: false, error: `File "${file.name}" exceeds 50MB limit` };
+    return { valid: false, error: `File "${file.name}" exceeds 500MB limit` };
   }
   return { valid: true };
 };

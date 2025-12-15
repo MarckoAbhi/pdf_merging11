@@ -114,7 +114,7 @@ const Index = () => {
               transition={{ duration: 0.5, delay: 0.5 }}
               className="flex flex-wrap items-center justify-center gap-6 mt-10 text-sm text-muted-foreground"
             >
-              {['No signup required', 'Up to 50MB per file', 'Batch processing'].map((item) => (
+              {['No signup required', 'Up to 500MB per file', 'Batch processing'].map((item) => (
                 <span key={item} className="flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-success" />
                   {item}

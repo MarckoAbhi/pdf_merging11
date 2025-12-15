@@ -141,7 +141,7 @@ export const GeneralFileDropzone = ({
               {isDragging ? 'Drop your files here' : 'Drag & drop files here'}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Images, PDFs, Docs, PPT, ZIP, and more • Max 50MB per file
+              Images, PDFs, Docs, PPT, ZIP, and more • Max 500MB per file
             </p>
           </div>
         </div>
