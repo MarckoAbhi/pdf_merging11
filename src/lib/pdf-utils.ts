@@ -188,74 +188,59 @@ export const formatFileSize = (bytes: number): string => {
 export const compressPDF = async (file: File, quality: number): Promise<Blob> => {
   const arrayBuffer = await file.arrayBuffer();
   
-  // Load the PDF with pdf-lib
-  const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
-  
-  // Get all pages
-  const pages = pdfDoc.getPages();
-  
-  if (pages.length === 0) {
-    throw new Error('PDF has no pages');
-  }
+  // Always use image-based compression for reliable file size reduction
+  const pdfjsLib = await loadPdfJs();
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdfDocument = await loadingTask.promise;
+  const numPages = pdfDocument.numPages;
 
-  // For lower quality settings, we'll downsample embedded images
-  // pdf-lib's save method with proper options handles compression
-  const pdfBytes = await pdfDoc.save({
-    useObjectStreams: true, // Compress objects into streams
-    addDefaultPage: false,
+  // Scale based on quality - higher quality = higher resolution
+  // Quality 100 = scale 1.5, Quality 50 = scale 1.0, Quality 10 = scale 0.5
+  const scale = 0.5 + (quality / 100) * 1.0;
+  
+  // JPEG quality based on compression level
+  const jpegQuality = Math.max(0.3, Math.min(0.95, quality / 100));
+
+  const firstPage = await pdfDocument.getPage(1);
+  const firstViewport = firstPage.getViewport({ scale: 1 }); // Get original size
+  const orientation = firstViewport.width > firstViewport.height ? 'landscape' : 'portrait';
+
+  const doc = new jsPDF({
+    orientation: orientation as 'portrait' | 'landscape',
+    unit: 'pt',
+    format: [firstViewport.width, firstViewport.height],
+    compress: true,
   });
 
-  // If user wants aggressive compression (quality < 50), we need to re-render
-  if (quality < 50) {
-    const pdfjsLib = await loadPdfJs();
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-    const pdfDocument = await loadingTask.promise;
-    const numPages = pdfDocument.numPages;
+  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+    const page = await pdfDocument.getPage(pageNum);
+    const originalViewport = page.getViewport({ scale: 1 });
+    const renderViewport = page.getViewport({ scale });
+    
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    if (!context) throw new Error('Could not create canvas context');
+    
+    canvas.width = renderViewport.width;
+    canvas.height = renderViewport.height;
 
-    const firstPage = await pdfDocument.getPage(1);
-    const scale = quality > 30 ? 0.8 : 0.6; // Lower scale = smaller file
-    const firstViewport = firstPage.getViewport({ scale });
-    const orientation = firstViewport.width > firstViewport.height ? 'landscape' : 'portrait';
+    await page.render({ canvasContext: context, viewport: renderViewport }).promise;
 
-    const doc = new jsPDF({
-      orientation: orientation as 'portrait' | 'landscape',
-      unit: 'pt',
-      format: [firstViewport.width / scale, firstViewport.height / scale],
-      compress: true,
-    });
-
-    const jpegQuality = Math.max(0.3, quality / 100);
-
-    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-      const page = await pdfDocument.getPage(pageNum);
-      const viewport = page.getViewport({ scale });
-      
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      
-      if (!context) throw new Error('Could not create canvas context');
-      
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-
-      await page.render({ canvasContext: context, viewport }).promise;
-
-      const imgData = canvas.toDataURL('image/jpeg', jpegQuality);
-      
-      if (pageNum > 1) {
-        doc.addPage(
-          [viewport.width / scale, viewport.height / scale],
-          viewport.width > viewport.height ? 'landscape' : 'portrait'
-        );
-      }
-
-      doc.addImage(imgData, 'JPEG', 0, 0, viewport.width / scale, viewport.height / scale);
+    const imgData = canvas.toDataURL('image/jpeg', jpegQuality);
+    
+    if (pageNum > 1) {
+      doc.addPage(
+        [originalViewport.width, originalViewport.height],
+        originalViewport.width > originalViewport.height ? 'landscape' : 'portrait'
+      );
     }
 
-    return doc.output('blob');
+    // Draw image at original page dimensions for proper sizing
+    doc.addImage(imgData, 'JPEG', 0, 0, originalViewport.width, originalViewport.height);
   }
 
-  return new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+  return doc.output('blob');
 };
 
 export const convertPDFToImages = async (file: File, format: 'png' | 'jpeg'): Promise<Blob[]> => {
