@@ -117,7 +117,7 @@ export const FileDropzone = ({
               {isDragging ? 'Drop your PDFs here' : 'Drag & drop PDFs here'}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              or click to browse • Max 50MB per file
+              or click to browse • Max 500MB per file
             </p>
           </div>
         </div>
