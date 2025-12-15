@@ -4,6 +4,7 @@ import { Shield, Lock, Unlock, Menu, X, Layers, Minimize2, FileOutput, Users } f
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navLinks = [
   { href: '/encrypt', label: 'Encrypt', icon: Lock },
@@ -54,17 +55,20 @@ export const Header = () => {
                 </Link>
               );
             })}
+            <ThemeToggle />
           </nav>
 
           {/* Mobile Menu Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </Button>
+          <div className="flex items-center gap-2 md:hidden">
+            <ThemeToggle />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </Button>
+          </div>
         </div>
 
         {/* Mobile Navigation */}
