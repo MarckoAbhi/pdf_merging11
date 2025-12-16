@@ -3,25 +3,52 @@ import { motion } from 'framer-motion';
 import { Lock, ShieldCheck, AlertTriangle } from 'lucide-react';
 import JSZip from 'jszip';
 import { Layout } from '@/components/layout/Layout';
-import { GeneralFileDropzone } from '@/components/file/GeneralFileDropzone';
+import { FileDropzone } from '@/components/pdf/FileDropzone';
 import { PasswordInput } from '@/components/pdf/PasswordInput';
 import { Button } from '@/components/ui/button';
-import { ProcessedFile, encryptFile, downloadBlob, getEncryptedFileName } from '@/lib/file-utils';
+import { ProcessedPDF, downloadBlob } from '@/lib/pdf-utils';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const Encrypt = () => {
-  const [files, setFiles] = useState<ProcessedFile[]>([]);
+  const [files, setFiles] = useState<ProcessedPDF[]>([]);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const { toast } = useToast();
 
+  const encryptPDF = async (file: File, pwd: string): Promise<Blob> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('password', pwd);
+
+    const { data, error } = await supabase.functions.invoke('encrypt-pdf', {
+      body: formData,
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Failed to encrypt PDF');
+    }
+
+    // The response is already a Blob from the edge function
+    if (data instanceof Blob) {
+      return data;
+    }
+
+    // If it's an error response
+    if (data?.error) {
+      throw new Error(data.error);
+    }
+
+    throw new Error('Unexpected response from encryption service');
+  };
+
   const handleEncrypt = useCallback(async () => {
     if (!password) {
       toast({
         title: 'Password required',
-        description: 'Please enter a password to encrypt your files.',
+        description: 'Please enter a password to encrypt your PDFs.',
         variant: 'destructive',
       });
       return;
@@ -39,7 +66,7 @@ const Encrypt = () => {
     if (files.length === 0) {
       toast({
         title: 'No files selected',
-        description: 'Please upload at least one file.',
+        description: 'Please upload at least one PDF file.',
         variant: 'destructive',
       });
       return;
@@ -55,7 +82,7 @@ const Encrypt = () => {
       setFiles([...updatedFiles]);
 
       try {
-        const encryptedBlob = await encryptFile(updatedFiles[i].originalFile, password);
+        const encryptedBlob = await encryptPDF(updatedFiles[i].originalFile, password);
 
         updatedFiles[i] = {
           ...updatedFiles[i],
@@ -66,7 +93,7 @@ const Encrypt = () => {
         updatedFiles[i] = {
           ...updatedFiles[i],
           status: 'error',
-          error: error instanceof Error ? error.message : 'Failed to encrypt file',
+          error: error instanceof Error ? error.message : 'Failed to encrypt PDF',
         };
       }
 
@@ -80,14 +107,14 @@ const Encrypt = () => {
     if (successCount > 0) {
       toast({
         title: 'Encryption complete',
-        description: `Successfully encrypted ${successCount} file${successCount > 1 ? 's' : ''}.`,
+        description: `Successfully encrypted ${successCount} PDF${successCount > 1 ? 's' : ''}.`,
       });
     }
   }, [files, password, confirmPassword, toast]);
 
-  const handleDownload = useCallback((file: ProcessedFile) => {
+  const handleDownload = useCallback((file: ProcessedPDF) => {
     if (file.processedBlob) {
-      const newName = getEncryptedFileName(file.name);
+      const newName = file.name.replace('.pdf', '_encrypted.pdf');
       downloadBlob(file.processedBlob, newName);
     }
   }, []);
@@ -106,13 +133,13 @@ const Encrypt = () => {
     
     for (const file of successFiles) {
       if (file.processedBlob) {
-        const newName = getEncryptedFileName(file.name);
+        const newName = file.name.replace('.pdf', '_encrypted.pdf');
         zip.file(newName, file.processedBlob);
       }
     }
 
     const zipBlob = await zip.generateAsync({ type: 'blob' });
-    downloadBlob(zipBlob, 'encrypted_files.zip');
+    downloadBlob(zipBlob, 'encrypted_pdfs.zip');
   }, [files, handleDownload]);
 
   const handleReset = useCallback(() => {
@@ -138,10 +165,10 @@ const Encrypt = () => {
               <Lock className="w-8 h-8" />
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
-              Encrypt Any File
+              Encrypt PDF Files
             </h1>
             <p className="text-muted-foreground">
-              Protect images, documents, PDFs, ZIP files, and more with password encryption
+              Protect your PDF documents with password encryption
             </p>
           </motion.div>
 
@@ -154,8 +181,8 @@ const Encrypt = () => {
             {!isComplete ? (
               <>
                 <div className="p-6 rounded-2xl bg-card border border-border">
-                  <h2 className="font-semibold text-foreground mb-4">1. Upload Files</h2>
-                  <GeneralFileDropzone files={files} onFilesChange={setFiles} />
+                  <h2 className="font-semibold text-foreground mb-4">1. Upload PDFs</h2>
+                  <FileDropzone files={files} onFilesChange={setFiles} />
                 </div>
 
                 <div className="p-6 rounded-2xl bg-card border border-border">
@@ -175,9 +202,9 @@ const Encrypt = () => {
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
                   <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-medium text-foreground">AES-256 Encryption</p>
+                    <p className="font-medium text-foreground">256-bit AES Encryption</p>
                     <p className="text-muted-foreground">
-                      Your files are encrypted with military-grade security using Web Crypto API. Files are processed locally and never uploaded.
+                      Your PDFs are encrypted with industry-standard security. The encrypted PDF will require a password to open.
                     </p>
                   </div>
                 </div>
@@ -195,7 +222,7 @@ const Encrypt = () => {
                   ) : (
                     <>
                       <Lock className="w-5 h-5" />
-                      Encrypt {files.length > 0 ? `${files.length} File${files.length > 1 ? 's' : ''}` : 'Files'}
+                      Encrypt {files.length > 0 ? `${files.length} PDF${files.length > 1 ? 's' : ''}` : 'PDFs'}
                     </>
                   )}
                 </Button>
@@ -203,7 +230,7 @@ const Encrypt = () => {
             ) : (
               <>
                 <div className="p-6 rounded-2xl bg-card border border-border">
-                  <h2 className="font-semibold text-foreground mb-4">Download Encrypted Files</h2>
+                  <h2 className="font-semibold text-foreground mb-4">Download Encrypted PDFs</h2>
                   <div className="space-y-3">
                     {files.map((file) => (
                       <div
@@ -217,7 +244,7 @@ const Encrypt = () => {
                         <div>
                           <p className="font-medium text-foreground">{file.name}</p>
                           <p className="text-sm text-muted-foreground">
-                            {file.status === 'success' ? 'Encrypted' : file.error}
+                            {file.status === 'success' ? 'Password protected' : file.error}
                           </p>
                         </div>
                         {file.status === 'success' && (
@@ -244,7 +271,7 @@ const Encrypt = () => {
                   <div className="text-sm">
                     <p className="font-medium text-foreground">Remember your password</p>
                     <p className="text-muted-foreground">
-                      You'll need the password to decrypt these files. We don't store passwords, so make sure to save it securely.
+                      You'll need the password to open these PDFs. We don't store passwords, so make sure to save it securely.
                     </p>
                   </div>
                 </div>
@@ -254,7 +281,7 @@ const Encrypt = () => {
                   variant="outline"
                   className="w-full h-12"
                 >
-                  Encrypt More Files
+                  Encrypt More PDFs
                 </Button>
               </>
             )}
