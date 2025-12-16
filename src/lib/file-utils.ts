@@ -47,8 +47,8 @@ export const getFileExtension = (filename: string): string => {
 };
 
 export const getEncryptedFileName = (originalName: string): string => {
-  // Keep original extension and add .enc suffix to preserve file type info
-  return `${originalName}.enc`;
+  // User request: keep the original filename (no added suffix like .enc)
+  return originalName;
 };
 
 export const encryptFile = async (file: File, password: string): Promise<Blob> => {
