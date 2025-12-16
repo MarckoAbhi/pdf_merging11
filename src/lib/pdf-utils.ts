@@ -131,20 +131,39 @@ export const decryptPDF = async (
   file: File,
   password: string
 ): Promise<Blob> => {
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    // pdf-lib can load encrypted PDFs with ignoreEncryption flag
-    const pdfDoc = await PDFDocument.load(arrayBuffer, { 
-      ignoreEncryption: true 
+  // Use QPDF for proper password validation and decryption
+  const QPDF = (window as any).QPDF;
+  
+  if (!QPDF) {
+    // Load QPDF if not already loaded
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = '/qpdf/qpdf.js';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load QPDF library'));
+      document.head.appendChild(script);
     });
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const uint8Array = new Uint8Array(arrayBuffer);
+
+  try {
+    const qpdf = (window as any).QPDF;
     
-    const pdfBytes = await pdfDoc.save();
-    return new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+    // Use QPDF decrypt which validates the password
+    const decryptedPdf = await qpdf.decrypt({
+      arrayBuffer: uint8Array,
+      password: password,
+    });
+
+    return new Blob([decryptedPdf], { type: 'application/pdf' });
   } catch (error) {
-    if (error instanceof Error && error.message.includes('password')) {
+    const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
+    if (errorMessage.includes('password') || errorMessage.includes('invalid') || errorMessage.includes('incorrect')) {
       throw new Error('Incorrect password. Please try again.');
     }
-    throw new Error('Failed to unlock PDF. The file may be corrupted.');
+    throw new Error('Failed to unlock PDF. Wrong password or corrupted file.');
   }
 };
 
