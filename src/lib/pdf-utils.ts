@@ -188,21 +188,50 @@ export const formatFileSize = (bytes: number): string => {
 export const compressPDF = async (file: File, quality: number): Promise<Blob> => {
   const arrayBuffer = await file.arrayBuffer();
   
-  // Always use image-based compression for reliable file size reduction
+  // For higher quality (>40%), use pdf-lib optimization which preserves text quality
+  // For lower quality, use aggressive image-based compression
+  if (quality > 40) {
+    try {
+      const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+      
+      // Save with object streams enabled for better compression
+      const pdfBytes = await pdfDoc.save({
+        useObjectStreams: true,
+        addDefaultPage: false,
+      });
+      
+      const compressedBlob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+      
+      // If compression didn't help much, try image-based approach
+      if (compressedBlob.size >= file.size * 0.95) {
+        return await compressPDFWithImages(arrayBuffer, quality);
+      }
+      
+      return compressedBlob;
+    } catch {
+      // Fallback to image-based compression
+      return await compressPDFWithImages(arrayBuffer, quality);
+    }
+  }
+  
+  // For aggressive compression (quality <= 40%), always use image-based
+  return await compressPDFWithImages(arrayBuffer, quality);
+};
+
+const compressPDFWithImages = async (arrayBuffer: ArrayBuffer, quality: number): Promise<Blob> => {
   const pdfjsLib = await loadPdfJs();
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
   const pdfDocument = await loadingTask.promise;
   const numPages = pdfDocument.numPages;
 
-  // Scale based on quality - higher quality = higher resolution
-  // Quality 100 = scale 1.5, Quality 50 = scale 1.0, Quality 10 = scale 0.5
-  const scale = 0.5 + (quality / 100) * 1.0;
+  // Lower scale for better compression - quality 100 = 1.0, quality 10 = 0.3
+  const scale = Math.max(0.3, Math.min(1.0, quality / 100));
   
-  // JPEG quality based on compression level
-  const jpegQuality = Math.max(0.3, Math.min(0.95, quality / 100));
+  // JPEG quality - more aggressive compression
+  const jpegQuality = Math.max(0.2, Math.min(0.8, (quality / 100) * 0.8));
 
   const firstPage = await pdfDocument.getPage(1);
-  const firstViewport = firstPage.getViewport({ scale: 1 }); // Get original size
+  const firstViewport = firstPage.getViewport({ scale: 1 });
   const orientation = firstViewport.width > firstViewport.height ? 'landscape' : 'portrait';
 
   const doc = new jsPDF({
@@ -227,7 +256,17 @@ export const compressPDF = async (file: File, quality: number): Promise<Blob> =>
 
     await page.render({ canvasContext: context, viewport: renderViewport }).promise;
 
-    const imgData = canvas.toDataURL('image/jpeg', jpegQuality);
+    // Use blob instead of dataURL for smaller size
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error('Failed to create blob'))),
+        'image/jpeg',
+        jpegQuality
+      );
+    });
+    
+    const imgArrayBuffer = await blob.arrayBuffer();
+    const imgData = new Uint8Array(imgArrayBuffer);
     
     if (pageNum > 1) {
       doc.addPage(
@@ -236,7 +275,6 @@ export const compressPDF = async (file: File, quality: number): Promise<Blob> =>
       );
     }
 
-    // Draw image at original page dimensions for proper sizing
     doc.addImage(imgData, 'JPEG', 0, 0, originalViewport.width, originalViewport.height);
   }
 
