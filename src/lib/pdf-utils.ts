@@ -131,38 +131,85 @@ export const decryptPDF = async (
   file: File,
   password: string
 ): Promise<Blob> => {
-  // Use QPDF for proper password validation and decryption
-  const QPDF = (window as any).QPDF;
-  
-  if (!QPDF) {
-    // Load QPDF if not already loaded
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = '/qpdf/qpdf.js';
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load QPDF library'));
-      document.head.appendChild(script);
-    });
-  }
-
   const arrayBuffer = await file.arrayBuffer();
-  const uint8Array = new Uint8Array(arrayBuffer);
-
+  
+  // Use pdf.js to validate the password - it properly checks encryption
+  const pdfjsLib = await loadPdfJs();
+  
   try {
-    const qpdf = (window as any).QPDF;
-    
-    // Use QPDF decrypt which validates the password
-    const decryptedPdf = await qpdf.decrypt({
-      arrayBuffer: uint8Array,
+    // First, try to load with the provided password
+    // pdf.js will throw a PasswordException if the password is wrong
+    const loadingTask = pdfjsLib.getDocument({
+      data: arrayBuffer.slice(0), // Use a copy to avoid issues
       password: password,
     });
-
-    return new Blob([decryptedPdf], { type: 'application/pdf' });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
-    if (errorMessage.includes('password') || errorMessage.includes('invalid') || errorMessage.includes('incorrect')) {
+    
+    const pdfDocument = await loadingTask.promise;
+    const numPages = pdfDocument.numPages;
+    
+    if (numPages === 0) {
+      throw new Error('PDF has no pages');
+    }
+    
+    // Password was correct - now create an unprotected copy using jsPDF
+    const firstPage = await pdfDocument.getPage(1);
+    const firstViewport = firstPage.getViewport({ scale: 2 });
+    const orientation = firstViewport.width > firstViewport.height ? 'landscape' : 'portrait';
+    
+    const doc = new jsPDF({
+      orientation: orientation as 'portrait' | 'landscape',
+      unit: 'pt',
+      format: [firstViewport.width / 2, firstViewport.height / 2],
+    });
+    
+    // Render each page to canvas and add to new unencrypted PDF
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const page = await pdfDocument.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 2 });
+      
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      
+      if (!context) {
+        throw new Error('Could not create canvas context');
+      }
+      
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+      
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      
+      if (pageNum > 1) {
+        doc.addPage(
+          [viewport.width / 2, viewport.height / 2],
+          viewport.width > viewport.height ? 'landscape' : 'portrait'
+        );
+      }
+      
+      doc.addImage(imgData, 'JPEG', 0, 0, viewport.width / 2, viewport.height / 2);
+    }
+    
+    return doc.output('blob');
+  } catch (error: any) {
+    // Check for password-related errors from pdf.js
+    const errorMessage = error?.message?.toLowerCase() || '';
+    const errorName = error?.name?.toLowerCase() || '';
+    
+    if (
+      errorName.includes('password') ||
+      errorMessage.includes('password') ||
+      errorMessage.includes('incorrect') ||
+      errorMessage.includes('invalid') ||
+      error?.code === 1 // pdf.js PasswordException.NEED_PASSWORD
+    ) {
       throw new Error('Incorrect password. Please try again.');
     }
+    
     throw new Error('Failed to unlock PDF. Wrong password or corrupted file.');
   }
 };
