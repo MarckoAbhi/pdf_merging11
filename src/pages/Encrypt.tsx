@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, ShieldCheck, AlertTriangle } from 'lucide-react';
 import JSZip from 'jszip';
@@ -6,25 +6,8 @@ import { Layout } from '@/components/layout/Layout';
 import { FileDropzone } from '@/components/pdf/FileDropzone';
 import { PasswordInput } from '@/components/pdf/PasswordInput';
 import { Button } from '@/components/ui/button';
-import { ProcessedPDF, downloadBlob } from '@/lib/pdf-utils';
+import { ProcessedPDF, downloadBlob, encryptPDF } from '@/lib/pdf-utils';
 import { useToast } from '@/hooks/use-toast';
-
-// Declare QPDF as a global type
-declare global {
-  interface Window {
-    QPDF: {
-      path: string;
-      encrypt: (options: {
-        arrayBuffer: ArrayBuffer;
-        userPassword: string;
-        ownerPassword: string;
-        keyLength?: number;
-        callback: (err: Error | null, result?: ArrayBuffer) => void;
-        logger?: (msg: string) => void;
-      }) => void;
-    };
-  }
-}
 
 const Encrypt = () => {
   const [files, setFiles] = useState<ProcessedPDF[]>([]);
@@ -32,73 +15,7 @@ const Encrypt = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
-  const [qpdfLoaded, setQpdfLoaded] = useState(false);
   const { toast } = useToast();
-
-  // Load QPDF script on mount
-  useEffect(() => {
-    if (window.QPDF) {
-      window.QPDF.path = '/qpdf/';
-      setQpdfLoaded(true);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = '/qpdf/qpdf.js';
-    script.async = true;
-    script.onload = () => {
-      if (window.QPDF) {
-        window.QPDF.path = '/qpdf/';
-        setQpdfLoaded(true);
-      }
-    };
-    script.onerror = () => {
-      toast({
-        title: 'Error loading encryption library',
-        description: 'Please refresh the page and try again.',
-        variant: 'destructive',
-      });
-    };
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, [toast]);
-
-  const encryptPDF = async (file: File, pwd: string): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      if (!window.QPDF) {
-        reject(new Error('Encryption library not loaded'));
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        const arrayBuffer = reader.result as ArrayBuffer;
-        
-        window.QPDF.encrypt({
-          arrayBuffer,
-          userPassword: pwd,
-          ownerPassword: pwd,
-          keyLength: 256,
-          logger: (msg) => console.log('[QPDF]', msg),
-          callback: (err, result) => {
-            if (err) {
-              reject(err);
-            } else if (result) {
-              const blob = new Blob([result], { type: 'application/pdf' });
-              resolve(blob);
-            } else {
-              reject(new Error('No result from encryption'));
-            }
-          },
-        });
-      };
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsArrayBuffer(file);
-    });
-  };
 
   const handleEncrypt = useCallback(async () => {
     if (!password) {
@@ -123,15 +40,6 @@ const Encrypt = () => {
       toast({
         title: 'No files selected',
         description: 'Please upload at least one PDF file.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!qpdfLoaded) {
-      toast({
-        title: 'Please wait',
-        description: 'Encryption library is still loading.',
         variant: 'destructive',
       });
       return;
@@ -175,7 +83,7 @@ const Encrypt = () => {
         description: `Successfully encrypted ${successCount} PDF${successCount > 1 ? 's' : ''}.`,
       });
     }
-  }, [files, password, confirmPassword, toast, qpdfLoaded]);
+  }, [files, password, confirmPassword, toast]);
 
   const handleDownload = useCallback((file: ProcessedPDF) => {
     if (file.processedBlob) {
@@ -212,7 +120,7 @@ const Encrypt = () => {
     setIsComplete(false);
   }, []);
 
-  const canEncrypt = files.length > 0 && password && password === confirmPassword && !isProcessing && qpdfLoaded;
+  const canEncrypt = files.length > 0 && password && password === confirmPassword && !isProcessing;
   const successFiles = files.filter((f) => f.status === 'success');
 
   return (
@@ -265,9 +173,9 @@ const Encrypt = () => {
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
                   <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-medium text-foreground">256-bit AES Encryption</p>
+                    <p className="font-medium text-foreground">Password Protection</p>
                     <p className="text-muted-foreground">
-                      Your PDFs are encrypted with industry-standard security. The encrypted PDF will require a password to open.
+                      Your PDFs will require a password to open. Make sure to remember your password.
                     </p>
                   </div>
                 </div>
@@ -281,11 +189,6 @@ const Encrypt = () => {
                     <>
                       <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
                       Encrypting...
-                    </>
-                  ) : !qpdfLoaded ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-                      Loading...
                     </>
                   ) : (
                     <>
