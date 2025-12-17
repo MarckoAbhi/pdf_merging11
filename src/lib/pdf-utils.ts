@@ -41,117 +41,40 @@ export const encryptPDF = async (
 ): Promise<Blob> => {
   const arrayBuffer = await file.arrayBuffer();
   
-  // First validate with pdf-lib (more forgiving parser)
-  let numPages: number;
+  // Validate PDF structure first
   try {
     const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
-    numPages = pdfDoc.getPageCount();
-    if (numPages === 0) {
+    if (pdfDoc.getPageCount() === 0) {
       throw new Error('PDF has no pages');
     }
   } catch (error: any) {
     throw new Error('Invalid PDF structure. The file may be corrupted.');
   }
-  
-  // Load PDF.js dynamically for rendering
-  const pdfjsLib = await loadPdfJs();
-  
-  let pdfDocument;
-  try {
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer.slice(0) });
-    pdfDocument = await loadingTask.promise;
-  } catch (error: any) {
-    throw new Error('Failed to process PDF. The file may be corrupted or in an unsupported format.');
-  }
 
-  // Use lower scale for faster processing (1.5 instead of 2)
-  const scale = 1.5;
-  
-  // Get first page to determine initial dimensions
-  const firstPage = await pdfDocument.getPage(1);
-  const firstViewport = firstPage.getViewport({ scale });
-  const orientation = firstViewport.width > firstViewport.height ? 'landscape' : 'portrait';
+  // Use QPDF for fast native encryption (no page rendering needed)
+  return new Promise((resolve, reject) => {
+    const QPDF = (window as any).QPDF;
+    
+    if (!QPDF) {
+      reject(new Error('QPDF library not loaded'));
+      return;
+    }
 
-  // Create encrypted PDF using jsPDF
-  const doc = new jsPDF({
-    orientation: orientation as 'portrait' | 'landscape',
-    unit: 'pt',
-    format: [firstViewport.width / scale, firstViewport.height / scale],
-    encryption: {
+    QPDF.encrypt({
+      logger: () => {}, // Suppress debug output
+      arrayBuffer: arrayBuffer,
       userPassword: password,
       ownerPassword: password,
-      userPermissions: ['print', 'copy']
-    }
-  });
-
-  // Process pages in batches for better performance
-  const batchSize = 5;
-  const totalPages = pdfDocument.numPages;
-  
-  for (let batchStart = 1; batchStart <= totalPages; batchStart += batchSize) {
-    const batchEnd = Math.min(batchStart + batchSize - 1, totalPages);
-    const pagePromises: Promise<{ pageNum: number; imgData: Uint8Array; width: number; height: number }>[] = [];
-    
-    // Process batch of pages in parallel
-    for (let pageNum = batchStart; pageNum <= batchEnd; pageNum++) {
-      pagePromises.push(
-        (async () => {
-          const page = await pdfDocument.getPage(pageNum);
-          const viewport = page.getViewport({ scale });
-          
-          // Create canvas for rendering
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          
-          if (!context) {
-            throw new Error('Could not create canvas context');
-          }
-          
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-
-          // Render PDF page to canvas
-          await page.render({
-            canvasContext: context,
-            viewport: viewport
-          }).promise;
-
-          // Use blob instead of dataURL for faster processing
-          const blob = await new Promise<Blob>((resolve, reject) => {
-            canvas.toBlob(
-              (b) => (b ? resolve(b) : reject(new Error('Failed to create blob'))),
-              'image/jpeg',
-              0.85 // Slightly lower quality for faster encoding
-            );
-          });
-          
-          const imgArrayBuffer = await blob.arrayBuffer();
-          return {
-            pageNum,
-            imgData: new Uint8Array(imgArrayBuffer),
-            width: viewport.width / scale,
-            height: viewport.height / scale
-          };
-        })()
-      );
-    }
-    
-    // Wait for batch to complete
-    const results = await Promise.all(pagePromises);
-    
-    // Add pages in order
-    for (const { pageNum, imgData, width, height } of results) {
-      if (pageNum > 1) {
-        doc.addPage(
-          [width, height],
-          width > height ? 'landscape' : 'portrait'
-        );
+      keyLength: 256,
+      callback: (err: Error | null, result: ArrayBuffer) => {
+        if (err) {
+          reject(new Error('Failed to encrypt PDF'));
+        } else if (result) {
+          resolve(new Blob([new Uint8Array(result)], { type: 'application/pdf' }));
+        }
       }
-      doc.addImage(imgData, 'JPEG', 0, 0, width, height);
-    }
-  }
-
-  return doc.output('blob');
+    });
+  });
 };
 
 export const getPDFInfo = async (file: File): Promise<{ pageCount: number }> => {
