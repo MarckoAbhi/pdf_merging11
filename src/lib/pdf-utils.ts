@@ -41,16 +41,27 @@ export const encryptPDF = async (
 ): Promise<Blob> => {
   const arrayBuffer = await file.arrayBuffer();
   
-  // Load PDF.js dynamically
+  // First validate with pdf-lib (more forgiving parser)
+  let numPages: number;
+  try {
+    const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+    numPages = pdfDoc.getPageCount();
+    if (numPages === 0) {
+      throw new Error('PDF has no pages');
+    }
+  } catch (error: any) {
+    throw new Error('Invalid PDF structure. The file may be corrupted.');
+  }
+  
+  // Load PDF.js dynamically for rendering
   const pdfjsLib = await loadPdfJs();
   
-  // Load PDF with pdf.js for rendering
-  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-  const pdfDocument = await loadingTask.promise;
-  const numPages = pdfDocument.numPages;
-
-  if (numPages === 0) {
-    throw new Error('PDF has no pages');
+  let pdfDocument;
+  try {
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer.slice(0) });
+    pdfDocument = await loadingTask.promise;
+  } catch (error: any) {
+    throw new Error('Failed to process PDF. The file may be corrupted or in an unsupported format.');
   }
 
   // Get first page to determine initial dimensions
@@ -71,7 +82,7 @@ export const encryptPDF = async (
   });
 
   // Render each page to canvas and add to jsPDF
-  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+  for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
     const page = await pdfDocument.getPage(pageNum);
     const viewport = page.getViewport({ scale: 2 });
     
