@@ -64,16 +64,19 @@ export const encryptPDF = async (
     throw new Error('Failed to process PDF. The file may be corrupted or in an unsupported format.');
   }
 
+  // Use lower scale for faster processing (1.5 instead of 2)
+  const scale = 1.5;
+  
   // Get first page to determine initial dimensions
   const firstPage = await pdfDocument.getPage(1);
-  const firstViewport = firstPage.getViewport({ scale: 2 }); // Higher scale for quality
+  const firstViewport = firstPage.getViewport({ scale });
   const orientation = firstViewport.width > firstViewport.height ? 'landscape' : 'portrait';
 
   // Create encrypted PDF using jsPDF
   const doc = new jsPDF({
     orientation: orientation as 'portrait' | 'landscape',
     unit: 'pt',
-    format: [firstViewport.width / 2, firstViewport.height / 2],
+    format: [firstViewport.width / scale, firstViewport.height / scale],
     encryption: {
       userPassword: password,
       ownerPassword: password,
@@ -81,48 +84,71 @@ export const encryptPDF = async (
     }
   });
 
-  // Render each page to canvas and add to jsPDF
-  for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-    const page = await pdfDocument.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2 });
+  // Process pages in batches for better performance
+  const batchSize = 5;
+  const totalPages = pdfDocument.numPages;
+  
+  for (let batchStart = 1; batchStart <= totalPages; batchStart += batchSize) {
+    const batchEnd = Math.min(batchStart + batchSize - 1, totalPages);
+    const pagePromises: Promise<{ pageNum: number; imgData: Uint8Array; width: number; height: number }>[] = [];
     
-    // Create canvas for rendering
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    
-    if (!context) {
-      throw new Error('Could not create canvas context');
-    }
-    
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
+    // Process batch of pages in parallel
+    for (let pageNum = batchStart; pageNum <= batchEnd; pageNum++) {
+      pagePromises.push(
+        (async () => {
+          const page = await pdfDocument.getPage(pageNum);
+          const viewport = page.getViewport({ scale });
+          
+          // Create canvas for rendering
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          
+          if (!context) {
+            throw new Error('Could not create canvas context');
+          }
+          
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
 
-    // Render PDF page to canvas
-    await page.render({
-      canvasContext: context,
-      viewport: viewport
-    }).promise;
+          // Render PDF page to canvas
+          await page.render({
+            canvasContext: context,
+            viewport: viewport
+          }).promise;
 
-    // Convert canvas to image data
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    
-    // Add new page if not first
-    if (pageNum > 1) {
-      doc.addPage(
-        [viewport.width / 2, viewport.height / 2],
-        viewport.width > viewport.height ? 'landscape' : 'portrait'
+          // Use blob instead of dataURL for faster processing
+          const blob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob(
+              (b) => (b ? resolve(b) : reject(new Error('Failed to create blob'))),
+              'image/jpeg',
+              0.85 // Slightly lower quality for faster encoding
+            );
+          });
+          
+          const imgArrayBuffer = await blob.arrayBuffer();
+          return {
+            pageNum,
+            imgData: new Uint8Array(imgArrayBuffer),
+            width: viewport.width / scale,
+            height: viewport.height / scale
+          };
+        })()
       );
     }
-
-    // Add image to PDF (scaled back to original size)
-    doc.addImage(
-      imgData,
-      'JPEG',
-      0,
-      0,
-      viewport.width / 2,
-      viewport.height / 2
-    );
+    
+    // Wait for batch to complete
+    const results = await Promise.all(pagePromises);
+    
+    // Add pages in order
+    for (const { pageNum, imgData, width, height } of results) {
+      if (pageNum > 1) {
+        doc.addPage(
+          [width, height],
+          width > height ? 'landscape' : 'portrait'
+        );
+      }
+      doc.addImage(imgData, 'JPEG', 0, 0, width, height);
+    }
   }
 
   return doc.output('blob');
