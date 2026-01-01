@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Shield, Lock, Unlock, Menu, X, Layers, Minimize2, FileOutput, Users } from 'lucide-react';
+import { Shield, Lock, Menu, X, Layers, Minimize2, FileOutput, Users } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -8,7 +8,6 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navLinks = [
   { href: '/encrypt', label: 'Encrypt', icon: Lock },
-  { href: '/unlock', label: 'Unlock', icon: Unlock },
   { href: '/merge', label: 'Merge', icon: Layers },
   { href: '/compress', label: 'Compress', icon: Minimize2 },
   { href: '/convert', label: 'Convert', icon: FileOutput },
