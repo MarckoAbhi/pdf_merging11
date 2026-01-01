@@ -41,14 +41,11 @@ export const encryptPDF = async (
 ): Promise<Blob> => {
   const arrayBuffer = await file.arrayBuffer();
   
-  // Validate PDF structure first
-  try {
-    const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
-    if (pdfDoc.getPageCount() === 0) {
-      throw new Error('PDF has no pages');
-    }
-  } catch (error: any) {
-    throw new Error('Invalid PDF structure. The file may be corrupted.');
+  // Quick validation - just check PDF header
+  const header = new Uint8Array(arrayBuffer.slice(0, 5));
+  const headerStr = String.fromCharCode(...header);
+  if (!headerStr.startsWith('%PDF')) {
+    throw new Error('Invalid PDF file');
   }
 
   // Use QPDF for fast native encryption (no page rendering needed)
@@ -56,9 +53,12 @@ export const encryptPDF = async (
     const QPDF = (window as any).QPDF;
     
     if (!QPDF) {
-      reject(new Error('QPDF library not loaded'));
+      reject(new Error('QPDF library not loaded. Please refresh the page.'));
       return;
     }
+
+    // Set the path for QPDF worker files
+    QPDF.path = '/qpdf/';
 
     QPDF.encrypt({
       logger: () => {}, // Suppress debug output
@@ -68,7 +68,7 @@ export const encryptPDF = async (
       keyLength: 256,
       callback: (err: Error | null, result: ArrayBuffer) => {
         if (err) {
-          reject(new Error('Failed to encrypt PDF'));
+          reject(new Error('Failed to encrypt PDF. File may be corrupted.'));
         } else if (result) {
           resolve(new Blob([new Uint8Array(result)], { type: 'application/pdf' }));
         }
