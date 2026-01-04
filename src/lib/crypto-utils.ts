@@ -87,9 +87,6 @@ export function isPDFFile(file: File): boolean {
  * Get encrypted file extension
  */
 export function getEncryptedFileName(originalName: string, fileType: 'pdf' | 'image'): string {
-  if (fileType === 'pdf') {
-    return originalName; // PDF stays as PDF with password protection
-  }
-  // For images, add .enc extension
-  return `${originalName}.enc`;
+  // Keep original filename for both PDFs and images
+  return originalName;
 }
