@@ -1,71 +1,101 @@
-// Encryption utilities using Web Crypto API (AES-GCM)
-
-const SALT_LENGTH = 16;
-const IV_LENGTH = 12;
-const ITERATIONS = 100000;
+// Image to PDF protection utilities
+import { PDFDocument } from 'pdf-lib';
 
 /**
- * Derives an AES-GCM key from a password using PBKDF2
+ * Convert an image to a password-protected PDF
+ * Uses QPDF for native PDF password protection
  */
-async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
-  const encoder = new TextEncoder();
-  const passwordBuffer = encoder.encode(password);
+export async function protectImageAsPDF(file: File, password: string): Promise<Blob> {
+  // First, create a PDF with the image embedded
+  const pdfDoc = await PDFDocument.create();
   
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    passwordBuffer,
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  );
+  const arrayBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
   
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt as BufferSource,
-      iterations: ITERATIONS,
-      hash: 'SHA-256'
-    },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
+  let image;
+  const mimeType = file.type.toLowerCase();
+  
+  if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+    image = await pdfDoc.embedJpg(bytes);
+  } else if (mimeType === 'image/png') {
+    image = await pdfDoc.embedPng(bytes);
+  } else {
+    // For other formats, convert to PNG using canvas
+    const img = await loadImage(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not create canvas context');
+    ctx.drawImage(img, 0, 0);
+    
+    const pngBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error('Failed to convert image'))),
+        'image/png'
+      );
+    });
+    
+    const pngBuffer = await pngBlob.arrayBuffer();
+    image = await pdfDoc.embedPng(new Uint8Array(pngBuffer));
+  }
+
+  // Add a page with the image dimensions
+  const page = pdfDoc.addPage([image.width, image.height]);
+  page.drawImage(image, {
+    x: 0,
+    y: 0,
+    width: image.width,
+    height: image.height,
+  });
+
+  // Save the unprotected PDF
+  const pdfBytes = await pdfDoc.save();
+  
+  // Now encrypt the PDF using QPDF
+  return new Promise((resolve, reject) => {
+    const QPDF = (window as any).QPDF;
+    
+    if (!QPDF) {
+      reject(new Error('QPDF library not loaded. Please refresh the page.'));
+      return;
+    }
+
+    QPDF.path = '/qpdf/';
+
+    QPDF.encrypt({
+      logger: () => {},
+      arrayBuffer: pdfBytes.buffer,
+      userPassword: password,
+      ownerPassword: password,
+      keyLength: 256,
+      callback: (err: Error | null, result: ArrayBuffer) => {
+        if (err) {
+          reject(new Error('Failed to protect image. Please try again.'));
+        } else if (result) {
+          resolve(new Blob([new Uint8Array(result)], { type: 'application/pdf' }));
+        }
+      }
+    });
+  });
 }
 
 /**
- * Encrypts any file (images, etc.) using AES-256-GCM
- * Output format: [magic(4)] + [salt(16)] + [iv(12)] + [encrypted data]
+ * Load an image from a File object
  */
-export async function encryptFile(file: File, password: string): Promise<Blob> {
-  const arrayBuffer = await file.arrayBuffer();
-  const data = new Uint8Array(arrayBuffer);
-  
-  // Generate random salt and IV
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
-  
-  // Derive key from password
-  const key = await deriveKey(password, salt);
-  
-  // Encrypt the data
-  const encryptedData = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv },
-    key,
-    data
-  );
-  
-  // Magic bytes to identify our encrypted files: "ENCF" (Encrypted File)
-  const magic = new Uint8Array([0x45, 0x4E, 0x43, 0x46]);
-  
-  // Combine: magic + salt + iv + encrypted data
-  const result = new Uint8Array(4 + SALT_LENGTH + IV_LENGTH + encryptedData.byteLength);
-  result.set(magic, 0);
-  result.set(salt, 4);
-  result.set(iv, 4 + SALT_LENGTH);
-  result.set(new Uint8Array(encryptedData), 4 + SALT_LENGTH + IV_LENGTH);
-  
-  return new Blob([result], { type: 'application/octet-stream' });
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => {
+      URL.revokeObjectURL(img.src);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      reject(new Error('Failed to load image'));
+    };
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 /**
@@ -84,15 +114,15 @@ export function isPDFFile(file: File): boolean {
 }
 
 /**
- * Get encrypted file extension
- * PDFs keep original name (native password protection)
- * Images get .encrypted extension (AES-256-GCM encrypted binary)
+ * Get protected file name
+ * PDFs keep original name
+ * Images become PDFs with .pdf extension
  */
-export function getEncryptedFileName(originalName: string, fileType: 'pdf' | 'image'): string {
+export function getProtectedFileName(originalName: string, fileType: 'pdf' | 'image'): string {
   if (fileType === 'pdf') {
-    return originalName; // PDF stays as PDF with native password protection
+    return originalName;
   }
-  // Images become encrypted binary data - must use different extension
-  // so users know they need to decrypt before viewing
-  return `${originalName}.encrypted`;
+  // Images become password-protected PDFs
+  const baseName = originalName.replace(/\.[^/.]+$/, '');
+  return `${baseName}.pdf`;
 }

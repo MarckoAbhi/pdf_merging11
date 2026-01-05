@@ -7,7 +7,7 @@ import { UniversalFileDropzone } from '@/components/pdf/UniversalFileDropzone';
 import { PasswordInput } from '@/components/pdf/PasswordInput';
 import { Button } from '@/components/ui/button';
 import { ProcessedPDF, downloadBlob, encryptPDF } from '@/lib/pdf-utils';
-import { encryptFile, isPDFFile, isImageFile, getEncryptedFileName } from '@/lib/crypto-utils';
+import { protectImageAsPDF, isPDFFile, isImageFile, getProtectedFileName } from '@/lib/crypto-utils';
 import { useToast } from '@/hooks/use-toast';
 
 const Encrypt = () => {
@@ -65,9 +65,9 @@ const Encrypt = () => {
           encryptedBlob = await encryptPDF(file, password);
           encryptedName = file.name;
         } else if (isImageFile(file)) {
-          // Use AES-256-GCM for image encryption
-          encryptedBlob = await encryptFile(file, password);
-          encryptedName = getEncryptedFileName(file.name, 'image');
+          // Convert image to password-protected PDF
+          encryptedBlob = await protectImageAsPDF(file, password);
+          encryptedName = getProtectedFileName(file.name, 'image');
         } else {
           throw new Error('Unsupported file type');
         }
@@ -210,9 +210,9 @@ const Encrypt = () => {
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
                   <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-medium text-foreground">Secure Encryption</p>
+                    <p className="font-medium text-foreground">Password Protection</p>
                     <p className="text-muted-foreground">
-                      PDFs use native password protection. Images are encrypted with AES-256-GCM.
+                      All files are converted to password-protected PDFs. You'll need the password to open them.
                     </p>
                   </div>
                 </div>
