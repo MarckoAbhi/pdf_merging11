@@ -1,6 +1,8 @@
-# Welcome to My Pdf Merging project
+# Welcome to FileForge project
 
 ## Project info
+
+**App view** ![Home](./public/home.png)
 
 **URL**: https://github.com/MarckoAbhi/pdf_merging11
 
