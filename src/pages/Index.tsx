@@ -280,12 +280,12 @@ const Index = () => {
                   Encrypt PDF Now
                 </Button>
               </Link>
-              <Link to="/unlock">
+              {/* <Link to="/unlock">
                 <Button size="lg" variant="outline" className="gap-2">
                   <Unlock className="w-5 h-5" />
                   Unlock PDF
                 </Button>
-              </Link>
+              </Link> */}
               <Link to="/merge">
                 <Button size="lg" variant="outline" className="gap-2">
                   <Layers className="w-5 h-5" />
