@@ -94,12 +94,12 @@ const Index = () => {
                   <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
-              <Link to="/unlock">
+              {/* <Link to="/unlock">
                 <Button size="lg" variant="outline" className="gap-2 px-8 h-14 text-lg">
                   <Unlock className="w-5 h-5" />
                   Unlock Files
                 </Button>
-              </Link>
+              </Link> */}
               <Link to="/merge">
                 <Button size="lg" variant="outline" className="gap-2 px-8 h-14 text-lg">
                   <Layers className="w-5 h-5" />
