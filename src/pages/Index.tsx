@@ -94,10 +94,10 @@ const Index = () => {
                   <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
-              <Link to="/convert">
+              <Link to="/unlock">
                 <Button size="lg" variant="outline" className="gap-2 px-8 h-14 text-lg">
-                  <Convert className="w-5 h-5" />
-                  Convert Files
+                  <Unlock className="w-5 h-5" />
+                  Unlock Files
                 </Button>
               </Link> 
               <Link to="/merge">
@@ -280,10 +280,10 @@ const Index = () => {
                   Encrypt PDF Now
                 </Button>
               </Link>
-              <Link to="/convert">
+              <Link to="/unlock">
                 <Button size="lg" variant="outline" className="gap-2">
-                  <Convert className="w-5 h-5" />
-                  Convert files
+                  <Unlock className="w-5 h-5" />
+                  Unlock files
                 </Button>
               </Link>
               <Link to="/merge">
