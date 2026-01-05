@@ -150,8 +150,15 @@ const Convert = () => {
 
   const handleDownloadPdf = useCallback(() => {
     if (!convertedPdf) return;
-    downloadBlob(convertedPdf, 'images_combined.pdf');
-  }, [convertedPdf]);
+    // Use first image name as base, or fallback to generic name
+    const baseName = imageFiles.length > 0 
+      ? imageFiles[0].name.replace(/\.[^/.]+$/, '') 
+      : 'converted';
+    const fileName = imageFiles.length > 1 
+      ? `${baseName}_and_${imageFiles.length - 1}_more.pdf`
+      : `${baseName}.pdf`;
+    downloadBlob(convertedPdf, fileName);
+  }, [convertedPdf, imageFiles]);
 
   const handlePdfReset = useCallback(() => {
     setPdfFiles([]);
