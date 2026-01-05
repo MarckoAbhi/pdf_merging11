@@ -94,12 +94,12 @@ const Index = () => {
                   <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
-              {/* <Link to="/unlock">
+              <Link to="/convert">
                 <Button size="lg" variant="outline" className="gap-2 px-8 h-14 text-lg">
-                  <Unlock className="w-5 h-5" />
-                  Unlock Files
+                  <Convert className="w-5 h-5" />
+                  Convert Files
                 </Button>
-              </Link> */}
+              </Link> 
               <Link to="/merge">
                 <Button size="lg" variant="outline" className="gap-2 px-8 h-14 text-lg">
                   <Layers className="w-5 h-5" />
@@ -280,12 +280,12 @@ const Index = () => {
                   Encrypt PDF Now
                 </Button>
               </Link>
-              {/* <Link to="/unlock">
+              <Link to="/convert">
                 <Button size="lg" variant="outline" className="gap-2">
-                  <Unlock className="w-5 h-5" />
-                  Unlock PDF
+                  <Convert className="w-5 h-5" />
+                  Convert files
                 </Button>
-              </Link> */}
+              </Link>
               <Link to="/merge">
                 <Button size="lg" variant="outline" className="gap-2">
                   <Layers className="w-5 h-5" />
