@@ -85,8 +85,14 @@ export function isPDFFile(file: File): boolean {
 
 /**
  * Get encrypted file extension
+ * PDFs keep original name (native password protection)
+ * Images get .encrypted extension (AES-256-GCM encrypted binary)
  */
 export function getEncryptedFileName(originalName: string, fileType: 'pdf' | 'image'): string {
-  // Keep original filename for both PDFs and images
-  return originalName;
+  if (fileType === 'pdf') {
+    return originalName; // PDF stays as PDF with native password protection
+  }
+  // Images become encrypted binary data - must use different extension
+  // so users know they need to decrypt before viewing
+  return `${originalName}.encrypted`;
 }

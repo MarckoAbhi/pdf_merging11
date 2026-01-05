@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { FileOutput, ShieldCheck, Image, FileText, Upload, ArrowRightLeft } from 'lucide-react';
+import { FileOutput, ShieldCheck, Image as ImageIcon, FileText, Upload, ArrowRightLeft } from 'lucide-react';
 import JSZip from 'jszip';
 import { Layout } from '@/components/layout/Layout';
 import { FileDropzone } from '@/components/pdf/FileDropzone';
@@ -220,7 +220,7 @@ const Convert = () => {
                 PDF to Image
               </TabsTrigger>
               <TabsTrigger value="image-to-pdf" className="gap-2">
-                <Image className="w-4 h-4" />
+                <ImageIcon className="w-4 h-4" />
                 Image to PDF
               </TabsTrigger>
             </TabsList>
@@ -250,13 +250,13 @@ const Convert = () => {
                           <SelectContent>
                             <SelectItem value="png">
                               <div className="flex items-center gap-2">
-                                <Image className="w-4 h-4" />
+                                <ImageIcon className="w-4 h-4" />
                                 PNG (Lossless, larger file)
                               </div>
                             </SelectItem>
                             <SelectItem value="jpeg">
                               <div className="flex items-center gap-2">
-                                <Image className="w-4 h-4" />
+                                <ImageIcon className="w-4 h-4" />
                                 JPEG (Compressed, smaller file)
                               </div>
                             </SelectItem>
@@ -301,7 +301,7 @@ const Convert = () => {
                         <div className="flex items-center justify-between p-4 rounded-xl bg-success/10 border border-success/20">
                           <div className="flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-success/20">
-                              <Image className="w-5 h-5 text-success" />
+                              <ImageIcon className="w-5 h-5 text-success" />
                             </div>
                             <div>
                               <p className="font-medium text-foreground">{convertedImages.length} Images Created</p>
