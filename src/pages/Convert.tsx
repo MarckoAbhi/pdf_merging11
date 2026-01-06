@@ -1,12 +1,12 @@
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { FileOutput, ShieldCheck, Image as ImageIcon, FileText, Upload, ArrowRightLeft } from 'lucide-react';
+import { FileOutput, ShieldCheck, Image as ImageIcon, FileText, Upload, ArrowRightLeft, BookOpen } from 'lucide-react';
 import JSZip from 'jszip';
 import { Layout } from '@/components/layout/Layout';
 import { FileDropzone } from '@/components/pdf/FileDropzone';
 import { ProcessingStatus } from '@/components/pdf/ProcessingStatus';
 import { Button } from '@/components/ui/button';
-import { ProcessedPDF, downloadBlob, getPDFInfo, convertPDFToImages, convertImagesToPDF, generateFileId } from '@/lib/pdf-utils';
+import { ProcessedPDF, downloadBlob, getPDFInfo, convertPDFToImages, convertImagesToPDF, convertEpubToPDF, generateFileId } from '@/lib/pdf-utils';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -20,7 +20,7 @@ interface ImageFile {
 }
 
 const Convert = () => {
-  const [conversionMode, setConversionMode] = useState<'pdf-to-image' | 'image-to-pdf'>('pdf-to-image');
+  const [conversionMode, setConversionMode] = useState<'pdf-to-image' | 'image-to-pdf' | 'epub-to-pdf'>('pdf-to-image');
   
   // PDF to Image state
   const [pdfFiles, setPdfFiles] = useState<ProcessedPDF[]>([]);
@@ -34,6 +34,12 @@ const Convert = () => {
   const [isImageProcessing, setIsImageProcessing] = useState(false);
   const [isImageComplete, setIsImageComplete] = useState(false);
   const [convertedPdf, setConvertedPdf] = useState<Blob | null>(null);
+  
+  // EPUB to PDF state
+  const [epubFile, setEpubFile] = useState<File | null>(null);
+  const [isEpubProcessing, setIsEpubProcessing] = useState(false);
+  const [isEpubComplete, setIsEpubComplete] = useState(false);
+  const [epubConvertedPdf, setEpubConvertedPdf] = useState<Blob | null>(null);
   
   const { toast } = useToast();
 
@@ -199,6 +205,62 @@ const Convert = () => {
 
   const canConvertPdf = pdfFiles.length > 0 && !isPdfProcessing;
   const canConvertImage = imageFiles.length > 0 && !isImageProcessing;
+  const canConvertEpub = epubFile !== null && !isEpubProcessing;
+
+  // EPUB to PDF conversion
+  const handleEpubToPdf = useCallback(async () => {
+    if (!epubFile) {
+      toast({
+        title: 'No file selected',
+        description: 'Please upload an EPUB file.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsEpubProcessing(true);
+    setIsEpubComplete(false);
+
+    try {
+      const pdfBlob = await convertEpubToPDF(epubFile);
+      setEpubConvertedPdf(pdfBlob);
+      setIsEpubComplete(true);
+      
+      toast({
+        title: 'Conversion complete',
+        description: 'Successfully converted EPUB to PDF.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Conversion failed',
+        description: error instanceof Error ? error.message : 'Failed to convert EPUB',
+        variant: 'destructive',
+      });
+    }
+
+    setIsEpubProcessing(false);
+  }, [epubFile, toast]);
+
+  const handleDownloadEpubPdf = useCallback(() => {
+    if (!epubConvertedPdf || !epubFile) return;
+    const baseName = epubFile.name.replace(/\.epub$/i, '');
+    downloadBlob(epubConvertedPdf, `${baseName}.pdf`);
+  }, [epubConvertedPdf, epubFile]);
+
+  const handleEpubReset = useCallback(() => {
+    setEpubFile(null);
+    setIsEpubComplete(false);
+    setEpubConvertedPdf(null);
+  }, []);
+
+  const handleEpubDrop = useCallback((files: File[]) => {
+    const epubFiles = files.filter(file => 
+      file.name.toLowerCase().endsWith('.epub')
+    );
+    if (epubFiles.length > 0) {
+      setEpubFile(epubFiles[0]);
+    }
+  }, []);
 
   return (
     <Layout>
@@ -220,15 +282,22 @@ const Convert = () => {
             </p>
           </motion.div>
 
-          <Tabs value={conversionMode} onValueChange={(v) => setConversionMode(v as 'pdf-to-image' | 'image-to-pdf')} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
+          <Tabs value={conversionMode} onValueChange={(v) => setConversionMode(v as 'pdf-to-image' | 'image-to-pdf' | 'epub-to-pdf')} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
               <TabsTrigger value="pdf-to-image" className="gap-2">
                 <FileText className="w-4 h-4" />
-                PDF to Image
+                <span className="hidden sm:inline">PDF to Image</span>
+                <span className="sm:hidden">PDF→IMG</span>
               </TabsTrigger>
               <TabsTrigger value="image-to-pdf" className="gap-2">
                 <ImageIcon className="w-4 h-4" />
-                Image to PDF
+                <span className="hidden sm:inline">Image to PDF</span>
+                <span className="sm:hidden">IMG→PDF</span>
+              </TabsTrigger>
+              <TabsTrigger value="epub-to-pdf" className="gap-2">
+                <BookOpen className="w-4 h-4" />
+                <span className="hidden sm:inline">EPUB to PDF</span>
+                <span className="sm:hidden">EPUB→PDF</span>
               </TabsTrigger>
             </TabsList>
 
@@ -469,6 +538,140 @@ const Convert = () => {
                       className="w-full h-12"
                     >
                       Convert More Images
+                    </Button>
+                  </>
+                )}
+              </motion.div>
+            </TabsContent>
+
+            <TabsContent value="epub-to-pdf">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="space-y-6"
+              >
+                {!isEpubComplete ? (
+                  <>
+                    <div className="p-6 rounded-2xl bg-card border border-border">
+                      <h2 className="font-semibold text-foreground mb-4">1. Upload EPUB File</h2>
+                      <div
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const files = Array.from(e.dataTransfer.files);
+                          handleEpubDrop(files);
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onClick={() => document.getElementById('epub-input')?.click()}
+                        className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                      >
+                        <input
+                          id="epub-input"
+                          type="file"
+                          accept=".epub"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              handleEpubDrop(Array.from(e.target.files));
+                            }
+                          }}
+                        />
+                        <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-foreground font-medium mb-1">
+                          Drop EPUB file here or click to browse
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Supports .epub files
+                        </p>
+                      </div>
+
+                      {epubFile && (
+                        <div className="mt-4 flex items-center justify-between p-4 rounded-xl bg-primary/5 border border-primary/20">
+                          <div className="flex items-center gap-3">
+                            <BookOpen className="w-5 h-5 text-primary" />
+                            <div>
+                              <p className="font-medium text-foreground">{epubFile.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {(epubFile.size / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEpubFile(null);
+                            }}
+                            className="p-2 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
+                      <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-medium text-foreground">EPUB to PDF Conversion</p>
+                        <p className="text-muted-foreground">
+                          Converts your EPUB e-book to a PDF document with clean text formatting.
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={handleEpubToPdf}
+                      disabled={!canConvertEpub}
+                      className="w-full h-14 text-lg gap-2 gradient-primary text-primary-foreground shadow-glow"
+                    >
+                      {isEpubProcessing ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                          Converting...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-5 h-5" />
+                          Convert EPUB to PDF
+                        </>
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-6 rounded-2xl bg-card border border-border">
+                      <h2 className="font-semibold text-foreground mb-4">Download Your PDF</h2>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-success/10 border border-success/20">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-success/20">
+                              <FileText className="w-5 h-5 text-success" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">PDF Created Successfully</p>
+                              <p className="text-sm text-muted-foreground">From: {epubFile?.name}</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <Button
+                          onClick={handleDownloadEpubPdf}
+                          className="w-full h-12 gap-2 gradient-primary text-primary-foreground"
+                        >
+                          <FileOutput className="w-5 h-5" />
+                          Download PDF
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={handleEpubReset}
+                      variant="outline"
+                      className="w-full h-12"
+                    >
+                      Convert Another EPUB
                     </Button>
                   </>
                 )}
