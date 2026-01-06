@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock, Unlock, Shield, Zap, Eye, FileText, ArrowRight, CheckCircle, Layers } from 'lucide-react';
+import { Lock, Shield, Zap, Eye, FileText, ArrowRight, CheckCircle, Layers,Convert } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 
@@ -94,10 +94,10 @@ const Index = () => {
                   <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
-              <Link to="/unlock">
+              <Link to="/convert">
                 <Button size="lg" variant="outline" className="gap-2 px-8 h-14 text-lg">
-                  <Unlock className="w-5 h-5" />
-                  Unlock Files
+                  <Convert className="w-5 h-5" />
+                  Convert Files
                 </Button>
               </Link> 
               <Link to="/merge">
@@ -280,10 +280,10 @@ const Index = () => {
                   Encrypt PDF Now
                 </Button>
               </Link>
-              <Link to="/unlock">
+              <Link to="/convert">
                 <Button size="lg" variant="outline" className="gap-2">
-                  <Unlock className="w-5 h-5" />
-                  Unlock files
+                  <Convert className="w-5 h-5" />
+                  Convert files
                 </Button>
               </Link>
               <Link to="/merge">
