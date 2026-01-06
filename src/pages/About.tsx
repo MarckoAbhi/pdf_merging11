@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import Link from "next/link";
 import { Shield, Users, Heart, Lock, Zap, Globe, Mail, Github } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -175,10 +176,16 @@ const About = () => {
                 <Mail className="w-5 h-5" />
                 Contact Us
               </Button>
-              <Button size="lg" variant="outline" className="gap-2">
-                <Github className="w-5 h-5" />
-                View on GitHub
-              </Button>
+              <Button asChild size="lg" variant="outline" className="gap-2">
+                <Link
+                  href="https://github.com/MarckoAbhi"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >
+                  <Github className="w-5 h-5" />
+                    View on GitHub
+                 </Link>
+               </Button>
             </div>
           </motion.div>
         </div>
