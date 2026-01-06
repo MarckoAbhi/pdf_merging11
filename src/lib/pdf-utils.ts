@@ -319,3 +319,95 @@ const loadImage = (file: File): Promise<HTMLImageElement> => {
     img.src = URL.createObjectURL(file);
   });
 };
+
+export const convertEpubToPDF = async (file: File): Promise<Blob> => {
+  const ePub = (await import('epubjs')).default;
+  const arrayBuffer = await file.arrayBuffer();
+  const book = ePub(arrayBuffer);
+  
+  await book.ready;
+  
+  const spine = book.spine as any;
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'pt',
+    format: 'a4',
+  });
+  
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  const contentWidth = pageWidth - 2 * margin;
+  const lineHeight = 16;
+  const fontSize = 12;
+  
+  doc.setFontSize(fontSize);
+  
+  let currentY = margin;
+  let isFirstPage = true;
+  
+  // Get all spine items
+  const spineItems: any[] = [];
+  spine.each((item: any) => {
+    spineItems.push(item);
+  });
+  
+  for (const item of spineItems) {
+    try {
+      const contents = await item.load(book.load.bind(book));
+      const doc_content = contents.document || contents;
+      
+      // Extract text content
+      const textContent = doc_content.body?.textContent || doc_content.textContent || '';
+      const lines = textContent.split(/\n+/).filter((line: string) => line.trim());
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
+        
+        // Word wrap the text
+        const words = trimmedLine.split(' ');
+        let currentLine = '';
+        
+        for (const word of words) {
+          const testLine = currentLine ? `${currentLine} ${word}` : word;
+          const textWidth = doc.getTextWidth(testLine);
+          
+          if (textWidth > contentWidth) {
+            if (currentLine) {
+              // Check if we need a new page
+              if (currentY + lineHeight > pageHeight - margin) {
+                doc.addPage();
+                currentY = margin;
+              }
+              doc.text(currentLine, margin, currentY);
+              currentY += lineHeight;
+            }
+            currentLine = word;
+          } else {
+            currentLine = testLine;
+          }
+        }
+        
+        // Print remaining text
+        if (currentLine) {
+          if (currentY + lineHeight > pageHeight - margin) {
+            doc.addPage();
+            currentY = margin;
+          }
+          doc.text(currentLine, margin, currentY);
+          currentY += lineHeight;
+        }
+        
+        // Add small spacing between paragraphs
+        currentY += lineHeight * 0.5;
+      }
+    } catch (e) {
+      console.warn('Failed to load chapter:', e);
+    }
+  }
+  
+  book.destroy();
+  
+  return doc.output('blob');
+};
