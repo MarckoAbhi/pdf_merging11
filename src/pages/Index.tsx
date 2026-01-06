@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock, Shield, Zap, Eye, FileText, ArrowRight, CheckCircle, Layers,Convert } from 'lucide-react';
+import { Lock, Shield, Zap, Eye, FileText, ArrowRight, CheckCircle, Layers, RefreshCw } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 
@@ -96,7 +96,7 @@ const Index = () => {
               </Link>
               <Link to="/convert">
                 <Button size="lg" variant="outline" className="gap-2 px-8 h-14 text-lg">
-                  <Convert className="w-5 h-5" />
+                  <RefreshCw className="w-5 h-5" />
                   Convert Files
                 </Button>
               </Link> 
@@ -282,7 +282,7 @@ const Index = () => {
               </Link>
               <Link to="/convert">
                 <Button size="lg" variant="outline" className="gap-2">
-                  <Convert className="w-5 h-5" />
+                  <RefreshCw className="w-5 h-5" />
                   Convert files
                 </Button>
               </Link>
