@@ -2,7 +2,9 @@
 
 ## Project info
 
-**App view** ![Home](./public/home.png)
+**App view** ![Home](./public/home1.png)
+
+**App view** ![Home](./public/home2.png)
 
 **URL**: https://github.com/MarckoAbhi/pdf_merging11
 
