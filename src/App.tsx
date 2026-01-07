@@ -13,17 +13,12 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const routerBasename =
-  import.meta.env.BASE_URL === "/"
-    ? "/"
-    : import.meta.env.BASE_URL.replace(/\/$/, "");
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <HashRouter basename={routerBasename}>
+      <HashRouter>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/encrypt" element={<Encrypt />} />
