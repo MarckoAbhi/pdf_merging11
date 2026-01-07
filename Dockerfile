@@ -12,6 +12,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Set base path to root for Docker deployment
+ENV VITE_BASE_PATH=/
+
 # Build the app for production
 RUN npm run build
 
