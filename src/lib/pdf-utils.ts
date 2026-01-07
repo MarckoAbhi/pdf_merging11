@@ -57,8 +57,8 @@ export const encryptPDF = async (
       return;
     }
 
-    // Set the path for QPDF worker files
-    QPDF.path = '/qpdf/';
+    // Set the path for QPDF worker files (works on GitHub Pages subpaths)
+    QPDF.path = `${import.meta.env.BASE_URL}qpdf/`;
 
     QPDF.encrypt({
       logger: () => {}, // Suppress debug output

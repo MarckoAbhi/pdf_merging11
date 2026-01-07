@@ -61,7 +61,7 @@ export async function protectImageAsPDF(file: File, password: string): Promise<B
       return;
     }
 
-    QPDF.path = '/qpdf/';
+    QPDF.path = `${import.meta.env.BASE_URL}qpdf/`;
 
     QPDF.encrypt({
       logger: () => {},
