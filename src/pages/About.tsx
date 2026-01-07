@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion';
-import Link from "next/link";
 import { Shield, Users, Heart, Lock, Zap, Globe, Mail, Github } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -177,15 +176,16 @@ const About = () => {
                 Contact Us
               </Button>
               <Button asChild size="lg" variant="outline" className="gap-2">
-                <Link
+                <a
                   href="https://github.com/MarckoAbhi"
                   target="_blank"
                   rel="noopener noreferrer"
-                  >
+                  className="inline-flex items-center gap-2"
+                >
                   <Github className="w-5 h-5" />
-                    View on GitHub
-                 </Link>
-               </Button>
+                  View on GitHub
+                </a>
+              </Button>
             </div>
           </motion.div>
         </div>
