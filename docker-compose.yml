@@ -1,0 +1,32 @@
+# Docker Compose for FileForge PDF Tools
+# Usage:
+#   Development: docker-compose up dev
+#   Production:  docker-compose up prod
+
+services:
+  # Development configuration with hot reload
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_BASE_PATH=/
+    stdin_open: true
+    tty: true
+
+  # Production configuration with nginx
+  prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
