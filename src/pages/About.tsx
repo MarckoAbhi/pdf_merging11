@@ -171,9 +171,15 @@ const About = () => {
               Have questions, feedback, or suggestions? We'd love to hear from you.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="gap-2 gradient-primary text-primary-foreground">
-                <Mail className="w-5 h-5" />
-                Contact Us
+              <Button
+                 asChild
+                 size="lg"
+                 className="gap-2 gradient-primary text-primary-foreground"
+              >
+                <a href="mailto:digitalindia1231@gmail.com">
+                   <Mail className="w-5 h-5" />
+                   Contact Us
+                </a>
               </Button>
               <Button asChild size="lg" variant="outline" className="gap-2">
                 <a
