@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Shield, Lock, Menu, X, Layers, Minimize2, FileOutput, Users } from 'lucide-react';
+import { Shield, Lock, Menu, X, Layers, Minimize2, FileOutput, Users, Maximize2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,7 @@ const navLinks = [
   { href: '/merge', label: 'Merge', icon: Layers },
   { href: '/compress', label: 'Compress', icon: Minimize2 },
   { href: '/convert', label: 'Convert', icon: FileOutput },
+  { href: '/resize', label: 'Resize', icon: Maximize2 },
   { href: '/about', label: 'About', icon: Users },
 ];
 

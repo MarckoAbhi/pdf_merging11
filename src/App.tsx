@@ -8,6 +8,7 @@ import Encrypt from "./pages/Encrypt";
 import Merge from "./pages/Merge";
 import Compress from "./pages/Compress";
 import Convert from "./pages/Convert";
+import Resize from "./pages/Resize";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 
@@ -25,6 +26,7 @@ const App = () => (
           <Route path="/merge" element={<Merge />} />
           <Route path="/compress" element={<Compress />} />
           <Route path="/convert" element={<Convert />} />
+          <Route path="/resize" element={<Resize />} />
           <Route path="/about" element={<About />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
