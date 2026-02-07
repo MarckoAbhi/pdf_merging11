@@ -9,6 +9,8 @@ import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+type UnitType = 'pixels' | 'percent' | 'centimeters' | 'inches';
+
 const Resize = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -22,9 +24,38 @@ const Resize = () => {
   const [outputFormat, setOutputFormat] = useState<'png' | 'jpeg' | 'webp'>('png');
   const [isProcessing, setIsProcessing] = useState(false);
   const [resizedImage, setResizedImage] = useState<string | null>(null);
+  const [unit, setUnit] = useState<UnitType>('pixels');
+  const [dpi, setDpi] = useState(72);
+  const [backgroundColor, setBackgroundColor] = useState<'transparent' | 'white' | 'black'>('transparent');
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
+
+  // Convert pixels to other units
+  const pixelsToUnit = useCallback((pixels: number, targetUnit: UnitType): number => {
+    switch (targetUnit) {
+      case 'pixels': return pixels;
+      case 'percent': return originalWidth > 0 ? Math.round((pixels / originalWidth) * 100) : 100;
+      case 'centimeters': return Math.round((pixels / dpi) * 2.54 * 100) / 100;
+      case 'inches': return Math.round((pixels / dpi) * 100) / 100;
+      default: return pixels;
+    }
+  }, [dpi, originalWidth]);
+
+  // Convert units back to pixels
+  const unitToPixels = useCallback((value: number, sourceUnit: UnitType): number => {
+    switch (sourceUnit) {
+      case 'pixels': return Math.round(value);
+      case 'percent': return Math.round((value / 100) * originalWidth);
+      case 'centimeters': return Math.round((value / 2.54) * dpi);
+      case 'inches': return Math.round(value * dpi);
+      default: return Math.round(value);
+    }
+  }, [dpi, originalWidth]);
+
+  // Get display values based on current unit
+  const displayWidth = pixelsToUnit(width, unit);
+  const displayHeight = pixelsToUnit(height, unit);
 
   const handleImageUpload = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -60,19 +91,21 @@ const Resize = () => {
     if (file) handleImageUpload(file);
   }, [handleImageUpload]);
 
-  const handleWidthChange = useCallback((newWidth: number) => {
-    setWidth(newWidth);
+  const handleWidthChange = useCallback((newDisplayWidth: number) => {
+    const newPixelWidth = unitToPixels(newDisplayWidth, unit);
+    setWidth(newPixelWidth);
     if (maintainAspectRatio && aspectRatio) {
-      setHeight(Math.round(newWidth / aspectRatio));
+      setHeight(Math.round(newPixelWidth / aspectRatio));
     }
-  }, [maintainAspectRatio, aspectRatio]);
+  }, [maintainAspectRatio, aspectRatio, unit, unitToPixels]);
 
-  const handleHeightChange = useCallback((newHeight: number) => {
-    setHeight(newHeight);
+  const handleHeightChange = useCallback((newDisplayHeight: number) => {
+    const newPixelHeight = unitToPixels(newDisplayHeight, unit);
+    setHeight(newPixelHeight);
     if (maintainAspectRatio && aspectRatio) {
-      setWidth(Math.round(newHeight * aspectRatio));
+      setWidth(Math.round(newPixelHeight * aspectRatio));
     }
-  }, [maintainAspectRatio, aspectRatio]);
+  }, [maintainAspectRatio, aspectRatio, unit, unitToPixels]);
 
   const handleScaleChange = useCallback((scale: number) => {
     const newWidth = Math.round(originalWidth * (scale / 100));
@@ -104,6 +137,12 @@ const Resize = () => {
         img.onerror = reject;
       });
 
+      // Fill background if not transparent
+      if (backgroundColor !== 'transparent') {
+        ctx.fillStyle = backgroundColor;
+        ctx.fillRect(0, 0, width, height);
+      }
+
       // Use high-quality image smoothing
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
@@ -129,7 +168,7 @@ const Resize = () => {
     }
 
     setIsProcessing(false);
-  }, [imagePreview, width, height, outputFormat, quality, toast]);
+  }, [imagePreview, width, height, outputFormat, quality, backgroundColor, toast]);
 
   const handleDownload = useCallback(() => {
     if (!resizedImage || !imageFile) return;
@@ -268,29 +307,64 @@ const Resize = () => {
                   </Select>
                 </div>
 
-                {/* Dimensions */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="width">Width (px)</Label>
-                    <Input
-                      id="width"
-                      type="number"
-                      value={width}
-                      onChange={(e) => handleWidthChange(parseInt(e.target.value) || 0)}
-                      min={1}
-                      max={10000}
-                    />
+                {/* Dimensions with Unit Selector */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-[1fr_1fr_auto] gap-4 items-end">
+                    <div className="space-y-2">
+                      <Label htmlFor="width">Width</Label>
+                      <Input
+                        id="width"
+                        type="number"
+                        value={displayWidth}
+                        onChange={(e) => handleWidthChange(parseFloat(e.target.value) || 0)}
+                        min={unit === 'percent' ? 1 : 0.01}
+                        step={unit === 'pixels' || unit === 'percent' ? 1 : 0.01}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="height">Height</Label>
+                      <Input
+                        id="height"
+                        type="number"
+                        value={displayHeight}
+                        onChange={(e) => handleHeightChange(parseFloat(e.target.value) || 0)}
+                        min={unit === 'percent' ? 1 : 0.01}
+                        step={unit === 'pixels' || unit === 'percent' ? 1 : 0.01}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Unit</Label>
+                      <Select value={unit} onValueChange={(v) => setUnit(v as UnitType)}>
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pixels">Pixels</SelectItem>
+                          <SelectItem value="percent">Percent</SelectItem>
+                          <SelectItem value="centimeters">Centimeters</SelectItem>
+                          <SelectItem value="inches">Inches</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="height">Height (px)</Label>
-                    <Input
-                      id="height"
-                      type="number"
-                      value={height}
-                      onChange={(e) => handleHeightChange(parseInt(e.target.value) || 0)}
-                      min={1}
-                      max={10000}
-                    />
+
+                  {/* Resolution/DPI */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="dpi">Resolution</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="dpi"
+                          type="number"
+                          value={dpi}
+                          onChange={(e) => setDpi(parseInt(e.target.value) || 72)}
+                          min={1}
+                          max={600}
+                          className="w-20"
+                        />
+                        <span className="text-sm text-muted-foreground">DPI</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -331,37 +405,80 @@ const Resize = () => {
                   />
                 </div>
 
-                {/* Output Format */}
-                <div className="space-y-3">
-                  <Label>Output Format</Label>
-                  <Select value={outputFormat} onValueChange={(v) => setOutputFormat(v as 'png' | 'jpeg' | 'webp')}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="png">PNG (Lossless)</SelectItem>
-                      <SelectItem value="jpeg">JPEG (Smaller file)</SelectItem>
-                      <SelectItem value="webp">WebP (Best compression)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Quality Slider (for JPEG/WebP) */}
-                {outputFormat !== 'png' && (
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <Label>Quality</Label>
-                      <span className="text-sm text-muted-foreground">{quality}%</span>
-                    </div>
-                    <Slider
-                      value={[quality]}
-                      onValueChange={(values) => setQuality(values[0])}
-                      min={1}
-                      max={100}
-                      step={1}
-                    />
+                {/* Format, Quality, and Background */}
+                <div className="grid grid-cols-3 gap-4">
+                  {/* Output Format */}
+                  <div className="space-y-2">
+                    <Label>Format</Label>
+                    <Select value={outputFormat} onValueChange={(v) => setOutputFormat(v as 'png' | 'jpeg' | 'webp')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="png">PNG</SelectItem>
+                        <SelectItem value="jpeg">JPG</SelectItem>
+                        <SelectItem value="webp">WebP</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
+
+                  {/* Quality */}
+                  <div className="space-y-2">
+                    <Label>Quality</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        value={quality}
+                        onChange={(e) => setQuality(Math.min(100, Math.max(1, parseInt(e.target.value) || 90)))}
+                        min={1}
+                        max={100}
+                        className="w-16"
+                        disabled={outputFormat === 'png'}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                  </div>
+
+                  {/* Background Color */}
+                  <div className="space-y-2">
+                    <Label>Background</Label>
+                    <div className="flex items-center gap-2 h-10">
+                      <button
+                        type="button"
+                        onClick={() => setBackgroundColor('transparent')}
+                        className={`w-8 h-8 rounded-full border-2 transition-all ${
+                          backgroundColor === 'transparent' 
+                            ? 'border-primary ring-2 ring-primary/30' 
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                        style={{
+                          background: 'repeating-conic-gradient(#ccc 0% 25%, transparent 0% 50%) 50% / 8px 8px'
+                        }}
+                        title="Transparent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setBackgroundColor('white')}
+                        className={`w-8 h-8 rounded-full border-2 bg-white transition-all ${
+                          backgroundColor === 'white' 
+                            ? 'border-primary ring-2 ring-primary/30' 
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                        title="White"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setBackgroundColor('black')}
+                        className={`w-8 h-8 rounded-full border-2 bg-black transition-all ${
+                          backgroundColor === 'black' 
+                            ? 'border-primary ring-2 ring-primary/30' 
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                        title="Black"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Info Box */}
